@@ -7,6 +7,11 @@
 extern "C" {
 #endif
 
+typedef struct kore_vulkan_descriptor_set_layout {
+	VkDescriptorSetLayout layout;
+	uint32_t bindings_count;
+} kore_vulkan_descriptor_set_layout;
+
 typedef struct kore_vulkan_descriptor_set {
 	struct kore_gpu_device *device;
 	VkDescriptorSet         descriptor_set;

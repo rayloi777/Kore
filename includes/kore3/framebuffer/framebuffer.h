@@ -32,7 +32,7 @@ typedef enum {
 /// </summary>
 /// <param name="width">The width to be used by the G1-API - typically the window-width</param>
 /// <param name="height">The height to be used by the G1-API - typically the window-height</param>
-KORE_FUNC void kore_fb_init();
+KORE_FUNC void kore_fb_init(void);
 
 /// <summary>
 /// Typically called once per frame before other G1-functions are called.

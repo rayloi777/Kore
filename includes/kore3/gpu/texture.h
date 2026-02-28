@@ -34,6 +34,9 @@
 extern "C" {
 #endif
 
+struct kore_gpu_device;
+struct kore_gpu_texture;
+
 typedef struct kore_gpu_texture {
 	uint32_t                width;
 	uint32_t                height;
@@ -71,6 +74,12 @@ typedef struct kore_gpu_texture_view {
 KORE_FUNC void kore_gpu_texture_set_name(kore_gpu_texture *texture, const char *name);
 
 KORE_FUNC void kore_gpu_texture_destroy(kore_gpu_texture *texture);
+
+KORE_FUNC void kore_gpu_texture_view_create(struct kore_gpu_device *device, kore_gpu_texture *texture, kore_gpu_texture_view *view);
+
+KORE_FUNC void kore_gpu_texture_view_destroy(kore_gpu_texture_view *view);
+
+KORE_FUNC void kore_gpu_texture_upload(struct kore_gpu_device *device, kore_gpu_texture *texture, const void *pixels, uint32_t width, uint32_t height);
 
 #ifdef __cplusplus
 }

@@ -328,7 +328,10 @@ void kore_vulkan_command_list_set_render_pipeline(kore_gpu_command_list *list, k
 }
 
 void kore_vulkan_command_list_draw(kore_gpu_command_list *list, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,
-                                   uint32_t first_instance) {}
+                                   uint32_t first_instance) {
+	resume_render_pass(list);
+	vkCmdDraw(list->vulkan.command_buffers[list->vulkan.active_command_buffer], vertex_count, instance_count, first_vertex, first_instance);
+}
 
 void kore_vulkan_command_list_draw_indexed(kore_gpu_command_list *list, uint32_t index_count, uint32_t instance_count, uint32_t first_index,
                                            int32_t base_vertex, uint32_t first_instance) {
@@ -507,7 +510,9 @@ void kore_vulkan_command_list_copy_texture_to_texture(kore_gpu_command_list *lis
 	               destination->texture->vulkan.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 }
 
-void kore_vulkan_command_list_clear_buffer(kore_gpu_command_list *list, kore_gpu_buffer *buffer, size_t offset, uint64_t size) {}
+void kore_vulkan_command_list_clear_buffer(kore_gpu_command_list *list, kore_gpu_buffer *buffer, size_t offset, uint64_t size) {
+	vkCmdFillBuffer(list->vulkan.command_buffers[list->vulkan.active_command_buffer], buffer->vulkan.buffer, offset, size, 0);
+}
 
 void kore_vulkan_command_list_set_compute_pipeline(kore_gpu_command_list *list, kore_vulkan_compute_pipeline *pipeline) {
 	vkCmdBindPipeline(list->vulkan.command_buffers[list->vulkan.active_command_buffer], VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline);

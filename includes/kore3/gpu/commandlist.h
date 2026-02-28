@@ -16,7 +16,10 @@
 
 /*! \file commandlist.h
     \brief The command list is used to send commands to the GPU.
-*/
+ */
+
+typedef struct kore_gpu_render_pipeline kore_gpu_render_pipeline;
+typedef struct kore_gpu_compute_pipeline kore_gpu_compute_pipeline;
 
 typedef enum kore_gpu_load_op { KORE_GPU_LOAD_OP_LOAD, KORE_GPU_LOAD_OP_CLEAR } kore_gpu_load_op;
 
@@ -196,6 +199,12 @@ KORE_FUNC void kore_gpu_command_list_resolve_query_set(kore_gpu_command_list *li
 
 KORE_FUNC void kore_gpu_command_list_set_index_buffer(kore_gpu_command_list *list, kore_gpu_buffer *buffer, kore_gpu_index_format index_format,
                                                       uint64_t offset_in_bytes);
+
+KORE_FUNC void kore_gpu_command_list_set_vertex_buffer(kore_gpu_command_list *list, uint32_t slot, kore_gpu_buffer *buffer, uint64_t offset, uint64_t size, uint64_t stride);
+
+KORE_FUNC void kore_gpu_command_list_set_pipeline(kore_gpu_command_list *list, kore_gpu_render_pipeline *pipeline);
+
+KORE_FUNC void kore_gpu_command_list_set_compute_pipeline(kore_gpu_command_list *list, kore_gpu_compute_pipeline *pipeline);
 
 KORE_FUNC void kore_gpu_command_list_draw(kore_gpu_command_list *list, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,
                                           uint32_t first_instance);

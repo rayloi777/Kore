@@ -91,6 +91,18 @@ void kore_gpu_command_list_set_index_buffer(kore_gpu_command_list *list, kore_gp
 	KORE_GPU_CALL4(command_list_set_index_buffer, list, buffer, index_format, offset);
 }
 
+void kore_gpu_command_list_set_vertex_buffer(kore_gpu_command_list *list, uint32_t slot, kore_gpu_buffer *buffer, uint64_t offset, uint64_t size, uint64_t stride) {
+	KORE_GPU_CALL6(command_list_set_vertex_buffer, list, slot, buffer, offset, size, stride);
+}
+
+void kore_gpu_command_list_set_pipeline(kore_gpu_command_list *list, kore_gpu_render_pipeline *pipeline) {
+	KORE_GPU_CALL2(command_list_set_render_pipeline, list, pipeline);
+}
+
+void kore_gpu_command_list_set_compute_pipeline(kore_gpu_command_list *list, kore_gpu_compute_pipeline *pipeline) {
+	// Not implemented in unified API yet - requires thread counts
+}
+
 void kore_gpu_command_list_draw(kore_gpu_command_list *list, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance) {
 	KORE_GPU_CALL5(command_list_draw, list, vertex_count, instance_count, first_vertex, first_instance);
 }

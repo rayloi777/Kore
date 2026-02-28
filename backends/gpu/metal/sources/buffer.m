@@ -1,6 +1,8 @@
 #include <kore3/metal/buffer_functions.h>
 
 #include <kore3/gpu/buffer.h>
+#include <kore3/gpu/device.h>
+#include <string.h>
 
 static uint64_t find_max_execution_index_all(kore_gpu_buffer *buffer) {
 	uint64_t max_execution_index = 0;
@@ -81,3 +83,13 @@ void *kore_metal_buffer_lock(kore_gpu_buffer *buffer, uint64_t offset, uint64_t 
 }
 
 void kore_metal_buffer_unlock(kore_gpu_buffer *buffer) {}
+
+void kore_metal_buffer_unlock_all(kore_gpu_buffer *buffer) {
+	buffer->metal.locked_data = NULL;
+}
+
+void kore_metal_buffer_upload(kore_gpu_device *device, const void *data, uint64_t size, uint32_t usage_flags, kore_gpu_buffer *buffer) {
+	void *ptr = kore_metal_buffer_lock_all(buffer);
+	memcpy(ptr, data, size);
+	kore_metal_buffer_unlock_all(buffer);
+}

@@ -27,3 +27,15 @@ void kore_gpu_texture_set_name(kore_gpu_texture *texture, const char *name) {
 void kore_gpu_texture_destroy(kore_gpu_texture *texture) {
 	KORE_GPU_CALL1(texture_destroy, texture);
 }
+
+void kore_gpu_texture_view_create(kore_gpu_device *device, kore_gpu_texture *texture, kore_gpu_texture_view *view) {
+	KORE_GPU_CALL3(texture_view_create, device, texture, view);
+}
+
+void kore_gpu_texture_view_destroy(kore_gpu_texture_view *view) {
+	KORE_GPU_CALL1(texture_view_destroy, view);
+}
+
+void kore_gpu_texture_upload(kore_gpu_device *device, kore_gpu_texture *texture, const void *pixels, uint32_t width, uint32_t height) {
+	KORE_GPU_CALL5(texture_upload, device, texture, pixels, width, height);
+}

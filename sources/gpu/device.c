@@ -2,16 +2,22 @@
 
 #if defined(KORE_DIRECT3D11)
 #include <kore3/direct3d11/device_functions.h>
+#include <kore3/direct3d11/sampler_functions.h>
 #elif defined(KORE_DIRECT3D12)
 #include <kore3/direct3d12/device_functions.h>
+#include <kore3/direct3d12/sampler_functions.h>
 #elif defined(KORE_METAL)
 #include <kore3/metal/device_functions.h>
+#include <kore3/metal/sampler_functions.h>
 #elif defined(KORE_OPENGL)
 #include <kore3/opengl/device_functions.h>
+#include <kore3/opengl/sampler_functions.h>
 #elif defined(KORE_VULKAN)
 #include <kore3/vulkan/device_functions.h>
+#include <kore3/vulkan/sampler_functions.h>
 #elif defined(KORE_WEBGPU)
 #include <kore3/webgpu/device_functions.h>
+#include <kore3/webgpu/sampler_functions.h>
 #elif defined(KORE_KOMPJUTA)
 #include <kore3/kompjuta/device_functions.h>
 #elif defined(KORE_CONSOLE)
@@ -86,6 +92,10 @@ void kore_gpu_device_create_sampler(kore_gpu_device *device, const kore_gpu_samp
 #endif
 
 	KORE_GPU_CALL3(device_create_sampler, device, parameters, sampler);
+}
+
+void kore_gpu_device_create_default_sampler(kore_gpu_device *device, kore_gpu_sampler *sampler) {
+	KORE_GPU_CALL2(device_create_default_sampler, device, sampler);
 }
 
 void kore_gpu_device_create_raytracing_volume(kore_gpu_device *device, kore_gpu_buffer *vertex_buffer, uint64_t vertex_count, kore_gpu_buffer *index_buffer,

@@ -156,17 +156,6 @@ kore_matrix4x4 kore_matrix4x4_rotation_x(float alpha) {
 	return m;
 }
 
-kore_matrix4x4 kore_matrix4x4_rotation_y(float alpha) {
-	kore_matrix4x4 m  = kore_matrix4x4_identity();
-	float          ca = cosf(alpha);
-	float          sa = sinf(alpha);
-	kore_matrix4x4_set(&m, 0, 0, ca);
-	kore_matrix4x4_set(&m, 2, 0, sa);
-	kore_matrix4x4_set(&m, 0, 2, -sa);
-	kore_matrix4x4_set(&m, 2, 2, ca);
-	return m;
-}
-
 kore_matrix4x4 kore_matrix4x4_rotation_z(float alpha) {
 	kore_matrix4x4 m  = kore_matrix4x4_identity();
 	float          ca = cosf(alpha);
@@ -175,6 +164,17 @@ kore_matrix4x4 kore_matrix4x4_rotation_z(float alpha) {
 	kore_matrix4x4_set(&m, 1, 0, -sa);
 	kore_matrix4x4_set(&m, 0, 1, sa);
 	kore_matrix4x4_set(&m, 1, 1, ca);
+	return m;
+}
+
+kore_matrix4x4 kore_matrix4x4_rotation_y(float alpha) {
+	kore_matrix4x4 m  = kore_matrix4x4_identity();
+	float          ca = cosf(alpha);
+	float          sa = sinf(alpha);
+	kore_matrix4x4_set(&m, 0, 0, ca);
+	kore_matrix4x4_set(&m, 2, 0, sa);
+	kore_matrix4x4_set(&m, 0, 2, -sa);
+	kore_matrix4x4_set(&m, 2, 2, ca);
 	return m;
 }
 
@@ -227,4 +227,56 @@ kore_float4 kore_matrix4x4_multiply_vector(kore_matrix4x4 *a, kore_float4 b) {
 		vector4_set(&product, y, t);
 	}
 	return product;
+}
+
+kore_matrix4x4 kore_matrix4x4_perspective(float fov, float aspect, float near, float far) {
+	float f = 1.0f / tanf(fov / 2.0f);
+	float nf = 1.0f / (near - far);
+	
+	kore_matrix4x4 m = {0};
+	kore_matrix4x4_set(&m, 0, 0, f / aspect);
+	kore_matrix4x4_set(&m, 1, 1, f);
+	kore_matrix4x4_set(&m, 2, 2, (far + near) * nf);
+	kore_matrix4x4_set(&m, 2, 3, -1.0f);
+	kore_matrix4x4_set(&m, 3, 2, 2 * far * near * nf);
+	return m;
+}
+
+kore_matrix4x4 kore_matrix4x4_look_at(kore_float3 eye, kore_float3 center, kore_float3 up) {
+	kore_float3 f = {
+		(center.x - eye.x),
+		(center.y - eye.y),
+		(center.z - eye.z),
+	};
+	float f_len = sqrtf(f.x * f.x + f.y * f.y + f.z * f.z);
+	f.x /= f_len; f.y /= f_len; f.z /= f_len;
+	
+	kore_float3 s = {
+		(f.y * up.z - f.z * up.y),
+		(f.z * up.x - f.x * up.z),
+		(f.x * up.y - f.y * up.x),
+	};
+	float s_len = sqrtf(s.x * s.x + s.y * s.y + s.z * s.z);
+	s.x /= s_len; s.y /= s_len; s.z /= s_len;
+	
+	kore_float3 u = {
+		(s.y * f.z - s.z * f.y),
+		(s.z * f.x - s.x * f.z),
+		(s.x * f.y - s.y * f.x),
+	};
+	
+	kore_matrix4x4 m = kore_matrix4x4_identity();
+	kore_matrix4x4_set(&m, 0, 0, s.x);
+	kore_matrix4x4_set(&m, 1, 0, s.y);
+	kore_matrix4x4_set(&m, 2, 0, s.z);
+	kore_matrix4x4_set(&m, 0, 1, u.x);
+	kore_matrix4x4_set(&m, 1, 1, u.y);
+	kore_matrix4x4_set(&m, 2, 1, u.z);
+	kore_matrix4x4_set(&m, 0, 2, -f.x);
+	kore_matrix4x4_set(&m, 1, 2, -f.y);
+	kore_matrix4x4_set(&m, 2, 2, -f.z);
+	kore_matrix4x4_set(&m, 0, 3, -(s.x * eye.x + s.y * eye.y + s.z * eye.z));
+	kore_matrix4x4_set(&m, 1, 3, -(u.x * eye.x + u.y * eye.y + u.z * eye.z));
+	kore_matrix4x4_set(&m, 2, 3, -(f.x * eye.x + f.y * eye.y + f.z * eye.z));
+	return m;
 }

@@ -34,7 +34,7 @@ extern "C" {
 #endif
 
 typedef struct kore_gpu_sampler {
-	KORE_GPU_IMPL(sampler);
+    KORE_GPU_IMPL(sampler);
 } kore_gpu_sampler;
 
 KORE_FUNC void kore_gpu_sampler_set_name(kore_gpu_sampler *sampler, const char *name);

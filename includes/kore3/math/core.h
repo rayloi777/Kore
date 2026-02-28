@@ -3,6 +3,8 @@
 
 #include <kore3/global.h>
 
+#include <math.h>
+
 /*! \file core.h
     \brief Just a few very simple additions to math.h
 */

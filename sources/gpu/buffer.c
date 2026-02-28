@@ -47,3 +47,11 @@ void *kore_gpu_buffer_lock(kore_gpu_buffer *buffer, uint64_t offset, uint64_t si
 void kore_gpu_buffer_unlock(kore_gpu_buffer *buffer) {
 	KORE_GPU_CALL1(buffer_unlock, buffer);
 }
+
+void kore_gpu_buffer_unlock_all(kore_gpu_buffer *buffer) {
+	KORE_GPU_CALL1(buffer_unlock_all, buffer);
+}
+
+void kore_gpu_buffer_upload(struct kore_gpu_device *device, const void *data, uint64_t size, uint32_t usage_flags, kore_gpu_buffer *buffer) {
+	KORE_GPU_CALL5(buffer_upload, device, data, size, usage_flags, buffer);
+}

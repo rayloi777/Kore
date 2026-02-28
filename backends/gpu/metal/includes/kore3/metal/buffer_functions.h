@@ -21,6 +21,10 @@ void *kore_metal_buffer_lock(kore_gpu_buffer *buffer, uint64_t offset, uint64_t 
 
 void kore_metal_buffer_unlock(kore_gpu_buffer *buffer);
 
+void kore_metal_buffer_unlock_all(kore_gpu_buffer *buffer);
+
+void kore_metal_buffer_upload(struct kore_gpu_device *device, const void *data, uint64_t size, uint32_t usage_flags, kore_gpu_buffer *buffer);
+
 #ifdef __cplusplus
 }
 #endif

@@ -137,6 +137,45 @@ void kore_metal_device_create(kore_gpu_device *device, const kore_gpu_device_wis
 		}
 	}
 
+	if (metal_library == nil) {
+		NSString *shader_source = @""
+			"#include <metal_stdlib>\n"
+			"#include <simd/simd.h>\n"
+			"using namespace metal;\n"
+			"struct _kong_color_out { float4 _0 [[color(0)]]; };\n"
+			"struct vertex_in { float3 position [[attribute(0)]]; float3 color [[attribute(1)]]; };\n"
+			"struct vertex_out { float4 position [[position]]; float3 color; };\n"
+			"struct Uniforms { float4x4 mvp; float time; };\n"
+			"vertex vertex_out vertex_main(vertex_in in [[stage_in]], constant Uniforms &uniforms [[buffer(1)]]) {\n"
+			"  float t = uniforms.time;\n"
+			"  float cosX = cos(t), sinX = sin(t);\n"
+			"  float cosY = cos(t * 0.7), sinY = sin(t * 0.7);\n"
+			"  float3 pos = in.position;\n"
+			"  float y = pos.y * cosX - pos.z * sinX;\n"
+			"  float z = pos.y * sinX + pos.z * cosX;\n"
+			"  pos.y = y; pos.z = z;\n"
+			"  float x = pos.x * cosY + pos.z * sinY;\n"
+			"  z = -pos.x * sinY + pos.z * cosY;\n"
+			"  pos.x = x; pos.z = z;\n"
+			"  vertex_out out;\n"
+			"  out.position = uniforms.mvp * float4(pos, 1.0);\n"
+			"  out.color = in.color;\n"
+			"  return out;\n"
+			"}\n"
+			"fragment _kong_color_out fragment_main(vertex_out in [[stage_in]]) {\n"
+			"  _kong_color_out out;\n"
+			"  out._0 = float4(in.color, 1.0);\n"
+			"  return out;\n"
+			"}\n";
+		NSError *error = nil;
+		MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
+		options.languageVersion = MTLLanguageVersion2_3;
+		metal_library = [metal_device newLibraryWithSource:shader_source options:options error:&error];
+		if (error != nil) {
+			NSLog(@"Failed to compile shader: %@", error);
+		}
+	}
+
 	device->metal.device  = (__bridge_retained void *)metal_device;
 	device->metal.library = (__bridge_retained void *)metal_library;
 

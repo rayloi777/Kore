@@ -2,9 +2,12 @@
 
 #include "buffer.c"
 #include "commandlist.c"
+#include "descriptorset.c"
 #include "device.c"
+#include "error.c"
 #include "fence.c"
 #include "gpu.c"
+#include "pipeline.c"
 #include "raytracing.c"
 #include "sampler.c"
 #include "texture.c"

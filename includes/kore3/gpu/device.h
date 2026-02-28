@@ -61,10 +61,11 @@ typedef enum kore_gpu_buffer_usage {
 	KORE_GPU_BUFFER_USAGE_CPU_WRITE         = 0x0002,
 	KORE_GPU_BUFFER_USAGE_COPY_SRC          = 0x0004,
 	KORE_GPU_BUFFER_USAGE_COPY_DST          = 0x0008,
-	KORE_GPU_BUFFER_USAGE_INDEX             = 0x0010,
-	KORE_GPU_BUFFER_USAGE_INDIRECT          = 0x0020,
-	KORE_GPU_BUFFER_USAGE_QUERY_RESOLVE     = 0x0040,
-	KORE_GPU_BUFFER_USAGE_RAYTRACING_VOLUME = 0x0080,
+	KORE_GPU_BUFFER_USAGE_VERTEX            = 0x0010,
+	KORE_GPU_BUFFER_USAGE_INDEX             = 0x0020,
+	KORE_GPU_BUFFER_USAGE_INDIRECT          = 0x0040,
+	KORE_GPU_BUFFER_USAGE_QUERY_RESOLVE     = 0x0080,
+	KORE_GPU_BUFFER_USAGE_RAYTRACING_VOLUME = 0x0100,
 } kore_gpu_buffer_usage;
 
 typedef struct kore_gpu_buffer_parameters {
@@ -85,6 +86,8 @@ typedef enum kore_gpu_texture_usage {
 	KORE_GPU_TEXTURE_USAGE_COPY_SRC          = 0x0001,
 	KORE_GPU_TEXTURE_USAGE_COPY_DST          = 0x0002,
 	KORE_GPU_TEXTURE_USAGE_RENDER_ATTACHMENT = 0x0004,
+	KORE_GPU_TEXTURE_USAGE_SAMPLED          = 0x0008,
+	KORE_GPU_TEXTURE_USAGE_STORAGE          = 0x0010,
 } kore_gpu_texture_usage;
 
 typedef struct kore_gpu_texture_parameters {
@@ -143,6 +146,8 @@ typedef struct kore_gpu_sampler_parameters {
 } kore_gpu_sampler_parameters;
 
 KORE_FUNC void kore_gpu_device_create_sampler(kore_gpu_device *device, const kore_gpu_sampler_parameters *parameters, kore_gpu_sampler *sampler);
+
+KORE_FUNC void kore_gpu_device_create_default_sampler(kore_gpu_device *device, kore_gpu_sampler *sampler);
 
 typedef enum kore_gpu_command_list_type {
 	KORE_GPU_COMMAND_LIST_TYPE_GRAPHICS,

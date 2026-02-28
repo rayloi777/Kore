@@ -84,6 +84,29 @@ void kore_metal_command_list_begin_render_pass(kore_gpu_command_list *list, cons
 
 	id<MTLCommandBuffer> command_buffer = (__bridge id<MTLCommandBuffer>)list->metal.command_buffer;
 	list->metal.render_command_encoder  = (__bridge_retained void *)[command_buffer renderCommandEncoderWithDescriptor:render_pass_descriptor];
+
+	id<MTLRenderCommandEncoder> render_encoder = (__bridge id<MTLRenderCommandEncoder>)list->metal.render_command_encoder;
+	[render_encoder setFrontFacingWinding:MTLWindingCounterClockwise];
+	[render_encoder setCullMode:MTLCullModeBack];
+
+	id<MTLTexture> texture = textures[0];
+	MTLViewport viewport = {
+		.originX = 0.0,
+		.originY = 0.0,
+		.width = texture.width,
+		.height = texture.height,
+		.znear = 0.0,
+		.zfar = 1.0
+	};
+	[render_encoder setViewport:viewport];
+
+	MTLScissorRect scissor = {
+		.x = 0,
+		.y = 0,
+		.width = texture.width,
+		.height = texture.height
+	};
+	[render_encoder setScissorRect:scissor];
 }
 
 void kore_metal_command_list_end_render_pass(kore_gpu_command_list *list) {
@@ -152,15 +175,15 @@ void kore_metal_command_list_set_index_buffer(kore_gpu_command_list *list, kore_
 	}
 }
 
-void kore_metal_command_list_set_vertex_buffer(kore_gpu_command_list *list, uint32_t slot, kore_metal_buffer *buffer, uint64_t offset, uint64_t size,
+void kore_metal_command_list_set_vertex_buffer(kore_gpu_command_list *list, uint32_t slot, kore_metal_buffer *metal_buffer_impl, uint64_t offset, uint64_t size,
                                                uint64_t stride) {
-	id<MTLBuffer>               metal_buffer           = (__bridge id<MTLBuffer>)buffer->buffer;
+	id<MTLBuffer>               metal_buffer           = (__bridge id<MTLBuffer>)metal_buffer_impl->buffer;
 	id<MTLRenderCommandEncoder> render_command_encoder = (__bridge id<MTLRenderCommandEncoder>)list->metal.render_command_encoder;
 
 	[render_command_encoder setVertexBuffer:metal_buffer offset:offset atIndex:slot];
 
-	if (buffer->host_visible) {
-		kore_metal_command_list_queue_buffer_access(list, buffer, (uint32_t)offset, (uint32_t)size);
+	if (metal_buffer_impl->host_visible) {
+		kore_metal_command_list_queue_buffer_access(list, metal_buffer_impl, (uint32_t)offset, (uint32_t)size);
 	}
 }
 

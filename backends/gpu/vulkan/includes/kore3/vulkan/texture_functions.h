@@ -11,6 +11,12 @@ void kore_vulkan_texture_set_name(kore_gpu_texture *texture, const char *name);
 
 void kore_vulkan_texture_destroy(kore_gpu_texture *texture);
 
+void kore_vulkan_texture_view_create(kore_gpu_device *device, kore_gpu_texture *texture, kore_gpu_texture_view *view);
+
+void kore_vulkan_texture_view_destroy(kore_gpu_texture_view *view);
+
+void kore_vulkan_texture_upload(kore_gpu_device *device, kore_gpu_texture *texture, const void *pixels, uint32_t width, uint32_t height);
+
 void kore_vulkan_texture_transition(kore_gpu_command_list *list, kore_gpu_texture *textur, VkImageLayout layout, uint32_t base_array_layer,
                                     uint32_t array_layer_count, uint32_t base_mip_level, uint32_t mip_level_count);
 

@@ -46,7 +46,7 @@ static kore_gpu_device       framebuffer_device;
 static kore_gpu_command_list framebuffer_list;
 static kore_gpu_buffer       framebuffer_buffer;
 
-void kore_fb_init() {
+void kore_fb_init(void) {
 	kore_gpu_device_wishlist wishlist = {0};
 	kore_gpu_device_create(&framebuffer_device, &wishlist);
 

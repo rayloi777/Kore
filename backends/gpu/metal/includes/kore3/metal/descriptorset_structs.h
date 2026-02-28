@@ -7,6 +7,10 @@
 extern "C" {
 #endif
 
+typedef struct kore_metal_descriptor_set_layout {
+	uint32_t bindings_count;
+} kore_metal_descriptor_set_layout;
+
 typedef struct kore_metal_descriptor_set {
 	kore_gpu_buffer argument_buffer;
 } kore_metal_descriptor_set;
