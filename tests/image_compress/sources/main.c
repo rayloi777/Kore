@@ -5,7 +5,6 @@
 #include <kore3/io/filereader.h>
 #include <kore3/math/matrix.h>
 #include <kore3/system.h>
-
 #include <kong.h>
 
 #include <assert.h>
@@ -13,6 +12,8 @@
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
+#include <time.h>
 
 static const int width  = 1920;
 static const int height = 1080;
@@ -40,12 +41,14 @@ static Vertex vertices[4] = {
     {  0.5f,  0.5f, 0.0f, 1.0f, 1.0f },
     { -0.5f,  0.5f, 0.0f, 0.0f, 1.0f },
 };
-
 static uint16_t indices[6] = {
     0, 1, 2,
     0, 2, 3,
 };
-
+static double get_time_ms(void) {
+    clock_t now = clock();
+    return (double)now * 1000.0 / CLOCKS_PER_SEC;
+}
 static void update(void *data) {
     kore_matrix4x4 mvp = kore_matrix4x4_identity();
     
@@ -64,12 +67,12 @@ static void update(void *data) {
     kore_gpu_texture *framebuffer = kore_gpu_device_get_framebuffer(&device);
 
     kore_gpu_color clear_color = {
-        .r = 0.2f,
-        .g = 0.2f,
-        .b = 0.3f,
+        .r = 0.1f,
+        .g = 0.1f,
+        .b = 0.1f,
         .a = 1.0f,
     };
-
+    
     kore_gpu_render_pass_parameters parameters = {
         .color_attachments_count = 1,
         .color_attachments = {
@@ -101,7 +104,6 @@ static void update(void *data) {
     kong_set_vertex_buffer_vertex_in(&list, &vertex_buffer);
     kong_set_descriptor_set_mvp(&list, &uniform_set);
     kong_set_descriptor_set_textures(&list, &texture_set);
-
     kore_gpu_command_list_set_index_buffer(&list, &index_buffer, KORE_GPU_INDEX_FORMAT_UINT16, 0);
     kore_gpu_command_list_draw_indexed(&list, 6, 1, 0, 0, 0);
 
@@ -109,18 +111,17 @@ static void update(void *data) {
     kore_gpu_command_list_present(&list);
     kore_gpu_device_execute_command_list(&device, &list);
 }
-
 int kickstart(int argc, char **argv) {
-    kore_init("Texture Test", width, height, NULL, NULL);
+    printf("\n=== Image Compression Test ===\n");
+    
+    kore_init("Image Compress Test", width, height, NULL, NULL);
     kore_set_update_callback(update, NULL);
 
     kore_gpu_device_wishlist wishlist = {0};
     kore_gpu_device_create(&device, &wishlist);
-
     kong_init(&device);
-
     kore_gpu_device_create_command_list(&device, KORE_GPU_COMMAND_LIST_TYPE_GRAPHICS, &list);
-
+    
     kore_gpu_buffer_parameters vertex_params = {
         .size = sizeof(vertices),
         .usage_flags = KORE_GPU_BUFFER_USAGE_VERTEX | KORE_GPU_BUFFER_USAGE_COPY_DST,
@@ -132,7 +133,7 @@ int kickstart(int argc, char **argv) {
         memcpy(ptr, vertices, sizeof(vertices));
         kong_vertex_in_buffer_unlock(&vertex_buffer);
     }
-
+    
     kore_gpu_buffer_parameters index_params = {
         .size = sizeof(indices),
         .usage_flags = KORE_GPU_BUFFER_USAGE_INDEX | KORE_GPU_BUFFER_USAGE_COPY_DST,
@@ -144,9 +145,9 @@ int kickstart(int argc, char **argv) {
         memcpy(ptr, indices, sizeof(indices));
         kore_gpu_buffer_unlock_all(&index_buffer);
     }
-
+    
     constants_type_buffer_create(&device, &uniform_buffer, 1);
-
+    
     kore_gpu_texture_parameters depth_params = {
         .width = width,
         .height = height,
@@ -158,27 +159,48 @@ int kickstart(int argc, char **argv) {
         .usage = KORE_GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
     };
     kore_gpu_device_create_texture(&device, &depth_params, &depth_texture);
-
-    kore_image image;
-    uint8_t *image_memory = (uint8_t *)malloc(512 * 512 * 4);
     
-    size_t image_size = kore_image_init_from_file(&image, image_memory, "haxe.png");
+    kore_image image;
+    uint8_t *image_memory = (uint8_t *)malloc(512 * 512 * 16);
+    
+    printf("Loading .k: haxe.k\n");
+    
+    double start_k = get_time_ms();
+    size_t image_size = kore_image_init_from_file(&image, image_memory, "haxe.k");
+    double load_k = get_time_ms() - start_k;
+    
+    printf("  File size: %zu bytes\n", image_size);
+    printf("  Load time: %.2f ms\n", load_k);
+    printf("  Dimensions: %dx%d\n", image.width, image.height);
     
     if (image_size == 0) {
-        for (int i = 0; i < 512 * 512; i++) {
-            int checker = ((i % 512) / 32 + (i / 512) / 32) % 2;
-            image_memory[i * 4 + 0] = checker ? 255 : 0;
-            image_memory[i * 4 + 1] = checker ? 0 : 255;
-            image_memory[i * 4 + 2] = 0;
-            image_memory[i * 4 + 3] = 255;
+        printf("  Failed to load .k, trying PNG...\n");
+        double start_png = get_time_ms();
+        image_size = kore_image_init_from_file(&image, image_memory, "haxe.png");
+        double load_png = get_time_ms() - start_png;
+        
+        printf("Loading PNG: haxe.png\n");
+        printf("  File size: %zu bytes\n", image_size);
+        printf("  Load time: %.2f ms\n", load_png);
+        
+        if (image_size == 0) {
+            printf("  Failed to load PNG, using checker pattern\n");
+            for (int i = 0; i < 512 * 512; i++) {
+                int checker = ((i % 512) / 32 + (i / 512) / 32) % 2;
+                image_memory[i * 4 + 0] = checker ? 255 : 0;
+                image_memory[i * 4 + 1] = checker ? 0 : 255;
+                image_memory[i * 4 + 2] = 0;
+                image_memory[i * 4 + 3] = 255;
+            }
+            image.width = 512;
+            image.height = 512;
         }
-        image.width = 512;
-        image.height = 512;
     }
+    
     image.depth = 1;
     image.format = KORE_IMAGE_FORMAT_RGBA32;
     image.data = image_memory;
-
+    
     kore_gpu_texture_parameters tex_params = {
         .width = image.width,
         .height = image.height,
@@ -190,28 +212,28 @@ int kickstart(int argc, char **argv) {
         .usage = KORE_GPU_TEXTURE_USAGE_SAMPLED | KORE_GPU_TEXTURE_USAGE_COPY_DST,
     };
     kore_gpu_device_create_texture(&device, &tex_params, &test_texture);
-
-    kore_gpu_texture_upload(&device, &test_texture, kore_image_get_pixels(&image), image.width, image.height);
-
+    
+    kore_gpu_texture_upload(&device, &test_texture, image_memory, image.width, image.height);
+    
     kore_image_destroy(&image);
     free(image_memory);
-
+    
     kore_gpu_texture_view_create(&device, &test_texture, &test_texture_view);
-
+    
     kore_gpu_device_create_default_sampler(&device, &test_sampler);
-
+    
     textures_parameters textures_params = {
         .tex = test_texture_view,
         .sam = &test_sampler,
     };
     kong_create_textures_set(&device, &textures_params, &texture_set);
-
+    
     mvp_parameters mvp_params = {
         .constants = &uniform_buffer,
     };
     kong_create_mvp_set(&device, &mvp_params, &uniform_set);
-
+    
     kore_start();
-
+    
     return 0;
 }

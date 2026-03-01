@@ -1,4 +1,4 @@
-let project = new Project('SIMD');
+const project = new Project('Audio-Test');
 
 await project.addProject(findKore());
 

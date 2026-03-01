@@ -47,6 +47,11 @@ KORE_FUNC kore_float4    kore_matrix4x4_multiply_vector(kore_matrix4x4 *a, kore_
 KORE_FUNC kore_matrix4x4 kore_matrix4x4_perspective(float fov, float aspect, float near, float far);
 KORE_FUNC kore_matrix4x4 kore_matrix4x4_look_at(kore_float3 eye, kore_float3 center, kore_float3 up);
 
+// SIMD optimized versions
+KORE_FUNC kore_matrix4x4 kore_matrix4x4_multiply_simd(kore_matrix4x4 *a, kore_matrix4x4 *b);
+KORE_FUNC kore_float4    kore_matrix4x4_multiply_vector_simd(kore_matrix4x4 *a, kore_float4 b);
+KORE_FUNC void           kore_matrix4x4_transpose_simd(kore_matrix4x4 *matrix);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,5 +1,6 @@
 #include <kore3/math/core.h>
 #include <kore3/math/matrix.h>
+#include <kore3/simd/float32x4.h>
 
 #include <string.h>
 
@@ -230,53 +231,109 @@ kore_float4 kore_matrix4x4_multiply_vector(kore_matrix4x4 *a, kore_float4 b) {
 }
 
 kore_matrix4x4 kore_matrix4x4_perspective(float fov, float aspect, float near, float far) {
-	float f = 1.0f / tanf(fov / 2.0f);
-	float nf = 1.0f / (near - far);
+	float uh = 1.0f / tanf(fov / 2.0f);
+	float uw = uh / aspect;
 	
-	kore_matrix4x4 m = {0};
-	kore_matrix4x4_set(&m, 0, 0, f / aspect);
-	kore_matrix4x4_set(&m, 1, 1, f);
-	kore_matrix4x4_set(&m, 2, 2, (far + near) * nf);
-	kore_matrix4x4_set(&m, 2, 3, -1.0f);
-	kore_matrix4x4_set(&m, 3, 2, 2 * far * near * nf);
+#if defined(KORE_METAL) || defined(KORE_VULKAN)
+	kore_matrix4x4 m = {
+		uw, 0, 0, 0,
+		0, uh, 0, 0,
+		0, 0, near / (near - far), -1,
+		0, 0, near * far / (near - far), 0
+	};
+#else
+	kore_matrix4x4 m = {
+		uw, 0, 0, 0,
+		0, uh, 0, 0,
+		0, 0, (far + near) / (near - far), -1,
+		0, 0, 2 * far * near / (near - far), 0
+	};
+#endif
 	return m;
 }
 
-kore_matrix4x4 kore_matrix4x4_look_at(kore_float3 eye, kore_float3 center, kore_float3 up) {
-	kore_float3 f = {
-		(center.x - eye.x),
-		(center.y - eye.y),
-		(center.z - eye.z),
-	};
-	float f_len = sqrtf(f.x * f.x + f.y * f.y + f.z * f.z);
-	f.x /= f_len; f.y /= f_len; f.z /= f_len;
+kore_matrix4x4 kore_matrix4x4_look_at(kore_float3 eye, kore_float3 at, kore_float3 up) {
+	kore_float3 zaxis = kore_float3_normalize(kore_float3_sub(at, eye));
+	kore_float3 xaxis = kore_float3_normalize(kore_float3_cross(zaxis, up));
+	kore_float3 yaxis = kore_float3_cross(xaxis, zaxis);
 	
-	kore_float3 s = {
-		(f.y * up.z - f.z * up.y),
-		(f.z * up.x - f.x * up.z),
-		(f.x * up.y - f.y * up.x),
+	kore_matrix4x4 m = {
+		xaxis.x, yaxis.x, -zaxis.x, 0,
+		xaxis.y, yaxis.y, -zaxis.y, 0,
+		xaxis.z, yaxis.z, -zaxis.z, 0,
+		-kore_float3_dot(xaxis, eye), -kore_float3_dot(yaxis, eye), kore_float3_dot(zaxis, eye), 1
 	};
-	float s_len = sqrtf(s.x * s.x + s.y * s.y + s.z * s.z);
-	s.x /= s_len; s.y /= s_len; s.z /= s_len;
-	
-	kore_float3 u = {
-		(s.y * f.z - s.z * f.y),
-		(s.z * f.x - s.x * f.z),
-		(s.x * f.y - s.y * f.x),
-	};
-	
-	kore_matrix4x4 m = kore_matrix4x4_identity();
-	kore_matrix4x4_set(&m, 0, 0, s.x);
-	kore_matrix4x4_set(&m, 1, 0, s.y);
-	kore_matrix4x4_set(&m, 2, 0, s.z);
-	kore_matrix4x4_set(&m, 0, 1, u.x);
-	kore_matrix4x4_set(&m, 1, 1, u.y);
-	kore_matrix4x4_set(&m, 2, 1, u.z);
-	kore_matrix4x4_set(&m, 0, 2, -f.x);
-	kore_matrix4x4_set(&m, 1, 2, -f.y);
-	kore_matrix4x4_set(&m, 2, 2, -f.z);
-	kore_matrix4x4_set(&m, 0, 3, -(s.x * eye.x + s.y * eye.y + s.z * eye.z));
-	kore_matrix4x4_set(&m, 1, 3, -(u.x * eye.x + u.y * eye.y + u.z * eye.z));
-	kore_matrix4x4_set(&m, 2, 3, -(f.x * eye.x + f.y * eye.y + f.z * eye.z));
 	return m;
+}
+
+kore_matrix4x4 kore_matrix4x4_multiply_simd(kore_matrix4x4 *a, kore_matrix4x4 *b) {
+	kore_matrix4x4 result;
+	
+	float *am = a->m;
+	float *bm = b->m;
+	float *rm = result.m;
+	
+	kore_float32x4 a_col0 = kore_float32x4_intrin_load_unaligned(&am[0]);
+	kore_float32x4 a_col1 = kore_float32x4_intrin_load_unaligned(&am[4]);
+	kore_float32x4 a_col2 = kore_float32x4_intrin_load_unaligned(&am[8]);
+	kore_float32x4 a_col3 = kore_float32x4_intrin_load_unaligned(&am[12]);
+	
+	for (int x = 0; x < 4; x++) {
+		float b0 = bm[x * 4 + 0];
+		float b1 = bm[x * 4 + 1];
+		float b2 = bm[x * 4 + 2];
+		float b3 = bm[x * 4 + 3];
+		
+		kore_float32x4 result_col = kore_float32x4_add(
+			kore_float32x4_add(
+				kore_float32x4_mul(kore_float32x4_load_all(b0), a_col0),
+				kore_float32x4_mul(kore_float32x4_load_all(b1), a_col1)
+			),
+			kore_float32x4_add(
+				kore_float32x4_mul(kore_float32x4_load_all(b2), a_col2),
+				kore_float32x4_mul(kore_float32x4_load_all(b3), a_col3)
+			)
+		);
+		
+		kore_float32x4_store_unaligned(&rm[x * 4], result_col);
+	}
+	
+	return result;
+}
+
+kore_float4 kore_matrix4x4_multiply_vector_simd(kore_matrix4x4 *a, kore_float4 b) {
+	kore_float32x4 a_col0 = kore_float32x4_intrin_load_unaligned(&a->m[0]);
+	kore_float32x4 a_col1 = kore_float32x4_intrin_load_unaligned(&a->m[4]);
+	kore_float32x4 a_col2 = kore_float32x4_intrin_load_unaligned(&a->m[8]);
+	kore_float32x4 a_col3 = kore_float32x4_intrin_load_unaligned(&a->m[12]);
+	
+	kore_float32x4 b0 = kore_float32x4_load_all(b.x);
+	kore_float32x4 b1 = kore_float32x4_load_all(b.y);
+	kore_float32x4 b2 = kore_float32x4_load_all(b.z);
+	kore_float32x4 b3 = kore_float32x4_load_all(b.w);
+	
+	kore_float32x4 result_vec = kore_float32x4_add(
+		kore_float32x4_add(kore_float32x4_mul(b0, a_col0), kore_float32x4_mul(b1, a_col1)),
+		kore_float32x4_add(kore_float32x4_mul(b2, a_col2), kore_float32x4_mul(b3, a_col3))
+	);
+	
+	kore_float4 result;
+	result.x = kore_float32x4_get(result_vec, 0);
+	result.y = kore_float32x4_get(result_vec, 1);
+	result.z = kore_float32x4_get(result_vec, 2);
+	result.w = kore_float32x4_get(result_vec, 3);
+	
+	return result;
+}
+
+void kore_matrix4x4_transpose_simd(kore_matrix4x4 *matrix) {
+	float *m = matrix->m;
+	
+	float tmp;
+	tmp = m[1];  m[1]  = m[4];  m[4]  = tmp;
+	tmp = m[2];  m[2]  = m[8];  m[8]  = tmp;
+	tmp = m[3];  m[3]  = m[12]; m[12] = tmp;
+	tmp = m[6];  m[6]  = m[9];  m[9]  = tmp;
+	tmp = m[7];  m[7]  = m[13]; m[13] = tmp;
+	tmp = m[11]; m[11] = m[14]; m[14] = tmp;
 }

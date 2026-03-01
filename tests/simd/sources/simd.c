@@ -453,7 +453,7 @@ int kickstart(int argc, char **argv) {
 	}
 
 	{
-		kore_int32x4 a = kore_int32x4_load((int32_t[4]){-2, -1, 1, 2});
+		kore_int32x4 a = kore_int32x4_load(-2, -1, 1, 2);
 		kore_int32x4 b = kore_int32x4_load_all(2);
 
 		kore_int32x4_mask mask;
@@ -509,7 +509,7 @@ int kickstart(int argc, char **argv) {
 	}
 
 	{
-		kore_uint32x4 a = kore_uint32x4_load((uint32_t[4]){1, 2, 3, 4});
+		kore_uint32x4 a = kore_uint32x4_load(1, 2, 3, 4);
 		kore_uint32x4 b = kore_uint32x4_load_all(2);
 
 		kore_uint32x4_mask mask;

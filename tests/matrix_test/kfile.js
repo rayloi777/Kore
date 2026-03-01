@@ -3,6 +3,7 @@ let project = new Project('Matrix-Test');
 await project.addProject(findKore());
 
 project.addFile('sources/**');
+project.addKongDir('shaders');
 project.setDebugDir('deployment');
 
 project.flatten();

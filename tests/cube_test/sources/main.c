@@ -85,18 +85,22 @@ static uint16_t indices[36] = {
 static void update(void *data) {
     time += 0.01f;
     
+    kore_gpu_texture *framebuffer = kore_gpu_device_get_framebuffer(&device);
+    float fb_width = (float)framebuffer->width;
+    float fb_height = (float)framebuffer->height;
+    
     float fov = 3.14159f / 4.0f;
-    float aspect = (float)width / (float)height;
+    float aspect = fb_width / fb_height;
     float near = 0.1f;
     float far = 100.0f;
     
     kore_matrix4x4 proj = kore_matrix4x4_perspective(fov, aspect, near, far);
-    kore_matrix4x4 view = kore_matrix4x4_look_at((kore_float3){0, 0, 3}, (kore_float3){0, 0, 0}, (kore_float3){0, 1, 0});
+    kore_matrix4x4 view = kore_matrix4x4_look_at((kore_float3){0, 0, 4}, (kore_float3){0, 0, 0}, (kore_float3){0, 1, 0});
     kore_matrix4x4 model_y = kore_matrix4x4_rotation_y(time);
     kore_matrix4x4 model_x = kore_matrix4x4_rotation_x(time * 0.7f);
-    kore_matrix4x4 model = kore_matrix4x4_multiply(&model_y, &model_x);
-    kore_matrix4x4 view_model = kore_matrix4x4_multiply(&view, &model);
-    kore_matrix4x4 mvp = kore_matrix4x4_multiply(&proj, &view_model);
+    kore_matrix4x4 model = kore_matrix4x4_multiply(&model_x, &model_y);
+    kore_matrix4x4 view_model = kore_matrix4x4_multiply(&model, &view);
+    kore_matrix4x4 mvp = kore_matrix4x4_multiply(&view_model, &proj);
     
     constants_type uniforms = {0};
     for (int i = 0; i < 16; i++) {
@@ -108,8 +112,6 @@ static void update(void *data) {
         *ptr = uniforms;
         constants_type_buffer_unlock(&uniform_buffer);
     }
-    
-    kore_gpu_texture *framebuffer = kore_gpu_device_get_framebuffer(&device);
 
     kore_gpu_color clear_color = {
         .r = 0.1f,
@@ -210,6 +212,14 @@ int kickstart(int argc, char **argv) {
     kong_create_everything_set(&device, &params, &uniform_set);
 
     kore_start();
+
+    kore_gpu_texture_destroy(&depth_texture);
+    kore_gpu_command_list_destroy(&list);
+    kong_destroy_buffer_vertex_in(&vertex_buffer);
+    kore_gpu_buffer_destroy(&index_buffer);
+    constants_type_buffer_destroy(&uniform_buffer);
+    kong_destroy_everything_set(&uniform_set);
+    kore_gpu_device_destroy(&device);
 
     return 0;
 }

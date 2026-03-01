@@ -55,6 +55,8 @@ open build/build/Release/Cube-Test.app
 | `tests/cube_test` | Rotating cube with colors | ✅ |
 | `tests/triangle_test` | Simple 2D triangle | ✅ |
 | `tests/texture_test` | Texture upload + sampling | ✅ |
+| `tests/audio_test` | Audio playback (OGG + sine wave) | ✅ |
+| `tests/matrix_test` | Matrix operations + SIMD benchmarks | ✅ |
 | `tests/shader-g5` | graphics5 API | ❌ Not implemented |
 | `tests/shader` | graphics4 API | ❌ Not implemented |
 
@@ -68,6 +70,19 @@ open build/build/Release/Texture-Test.app
 ```bash
 ./make -g metal --kore . --from tests/triangle --compile
 open build/build/Release/Triangle.app
+```
+
+### Build audio_test
+```bash
+./make -g metal --kore . --from tests/audio_test --compile
+open build/build/Release/Audio-Test.app
+```
+
+### Build matrix_test
+```bash
+./make -g metal --kore . --from tests/matrix_test --compile
+./build/build/Release/Matrix-Test.app/Contents/MacOS/Matrix-Test
+```
 ```
 
 ### Code Formatting
@@ -498,4 +513,367 @@ The Metal backend is configured to use counter-clockwise winding to be consisten
 // In commandlist.m - begin_render_pass
 [render_encoder setFrontFacingWinding:MTLWindingCounterClockwise];
 [render_encoder setCullMode:MTLCullModeBack];
+```
+
+## Metal & Vulkan Unified API
+
+### NDC Z Range
+
+Metal and Vulkan share the same NDC (Normalized Device Coordinates) Z range [0, 1]. This is unified in the codebase:
+
+| API | NDC Z Range | Status |
+|-----|-------------|--------|
+| Metal | [0, 1] | ✅ Unified |
+| Vulkan | [0, 1] | ✅ Unified |
+
+### Common Header
+
+The file `includes/kore3/gpu/common.h` provides shared definitions:
+
+```c
+#if defined(KORE_METAL) || defined(KORE_VULKAN)
+    #define KORE_GPU_NDC_Z_ZERO_ONE 1
+    #define KORE_GPU_FRAME_COUNT 2
+    #define KORE_GPU_EXECUTION_FENCE_COUNT 8
+    #define KORE_GPU_MAX_BUFFER_RANGES 16
+#endif
+```
+
+### Perspective Matrix
+
+Both Metal and Vulkan use the same perspective matrix formula:
+
+```c
+#if defined(KORE_METAL) || defined(KORE_VULKAN)
+    kore_matrix4x4_set(&m, 2, 2, near / (near - far));
+    kore_matrix4x4_set(&m, 2, 3, -1.0f);
+    kore_matrix4x4_set(&m, 3, 2, near * far / (near - far));
+#else
+    // OpenGL: NDC Z ∈ [-1, 1]
+    float nf = 1.0f / (near - far);
+    kore_matrix4x4_set(&m, 2, 2, (far + near) * nf);
+    kore_matrix4x4_set(&m, 2, 3, -1.0f);
+    kore_matrix4x4_set(&m, 3, 2, 2 * far * near * nf);
+#endif
+```
+
+### Viewport
+
+- **Metal**: Standard viewport (origin at top-left)
+- **Vulkan**: Y-axis flipped via negative viewport height
+
+## Common Issues and Fixes
+
+### texture_test Issues
+
+#### MVP Matrix Caused Black Screen
+
+**Problem**: texture_test showed black screen even though haxe.png was loaded.
+
+**Root Cause**: Incorrect matrix multiplication order in MVP calculation.
+
+**Original (WRONG)**:
+```c
+kore_matrix4x4 proj = kore_matrix4x4_perspective(fov, aspect, near, far);
+kore_matrix4x4 view = kore_matrix4x4_look_at(...);
+kore_matrix4x4 mvp = kore_matrix4x4_multiply(&view, &proj);  // WRONG
+```
+
+**Fix**: Use identity matrix for simple 2D rendering:
+```c
+kore_matrix4x4 mvp = kore_matrix4x4_identity();
+```
+
+Or use correct multiplication order:
+```c
+kore_matrix4x4 view_model = kore_matrix4x4_multiply(&model, &view);
+kore_matrix4x4 mvp = kore_matrix4x4_multiply(&view_model, &proj);
+```
+
+#### Image File Not Found
+
+**Problem**: `kore_image_init_from_file` returns 0 (file not found).
+
+**Solution**: Ensure image file is in app bundle:
+```javascript
+// In kfile.js
+project.addFile('deployment/**');
+project.setDebugDir('deployment');
+```
+Then copy to app Resources or run from correct directory.
+
+### Matrix Multiplication Order
+
+**Problem**: `kore_matrix4x4_multiply(a, b)` computes `b * a` (reverse order).
+
+**For standard MVP transformation** (proj * view * model):
+```c
+// WRONG - this computes proj * view
+kore_matrix4x4 mvp = kore_matrix4x4_multiply(&proj, &view);
+
+// CORRECT - multiply(a, b) = b * a
+kore_matrix4x4 model = ...;
+kore_matrix4x4 view = ...;
+kore_matrix4x4 proj = ...;
+kore_matrix4x4 view_model = kore_matrix4x4_multiply(&model, &view);  // = view * model
+kore_matrix4x4 mvp = kore_matrix4x4_multiply(&view_model, &proj);    // = proj * view * model
+```
+
+**For simple 2D rendering** (identity matrix):
+```c
+kore_matrix4x4 mvp = kore_matrix4x4_identity();
+```
+
+### Kong API Vertex Buffer Types
+
+**Problem**: Using wrong buffer type causes crashes.
+
+```c
+// WRONG - kore_gpu_buffer is generic
+static kore_gpu_buffer vertex_buffer;
+
+// CORRECT - use Kong generated types
+static vertex_in_buffer vertex_buffer;
+
+// WRONG - manual lock/unlock
+void *ptr = kore_gpu_buffer_lock_all(&vertex_buffer);
+
+// CORRECT - use Kong helper functions
+vertex_in *ptr = kong_vertex_in_buffer_lock(&vertex_buffer);
+memcpy(ptr, vertices, sizeof(vertices));
+kong_vertex_in_buffer_unlock(&vertex_buffer);
+```
+
+### Texture Image Loading Path
+
+**Problem**: Image file not found at runtime.
+
+The image path is relative to the app's working directory. For Metal apps, ensure the image is in the app bundle:
+```bash
+# Copy image to app Resources
+cp tests/texture_test/deployment/haxe.png build/build/Release/Texture-Test.app/Contents/Resources/
+```
+
+Or in kfile.js, ensure deployment folder is included:
+```javascript
+project.addFile('deployment/**');
+project.setDebugDir('deployment');
+```
+
+Then load with relative path:
+```c
+size_t image_size = kore_image_init_from_file(&image, memory, "haxe.png");
+```
+
+### Perspective Matrix NDC Z Range
+
+**Problem**: Metal and Vulkan use NDC Z range [0, 1], while OpenGL uses [-1, 1].
+
+```c
+kore_matrix4x4 kore_matrix4x4_perspective(float fov, float aspect, float near, float far) {
+    float f = 1.0f / tanf(fov / 2.0f);
+    
+    kore_matrix4x4 m = {0};
+    kore_matrix4x4_set(&m, 0, 0, f / aspect);
+    kore_matrix4x4_set(&m, 1, 1, f);
+    
+#if defined(KORE_METAL) || defined(KORE_VULKAN)
+    // Metal & Vulkan: NDC Z ∈ [0, 1]
+    kore_matrix4x4_set(&m, 2, 2, near / (near - far));
+    kore_matrix4x4_set(&m, 2, 3, -1.0f);
+    kore_matrix4x4_set(&m, 3, 2, near * far / (near - far));
+#else
+    // OpenGL: NDC Z ∈ [-1, 1]
+    float nf = 1.0f / (near - far);
+    kore_matrix4x4_set(&m, 2, 2, (far + near) * nf);
+    kore_matrix4x4_set(&m, 2, 3, -1.0f);
+    kore_matrix4x4_set(&m, 3, 2, 2 * far * near * nf);
+#endif
+    return m;
+}
+
+## Audio API
+
+Kore provides two levels of audio APIs.
+
+### Mixer API (High-level - Recommended)
+
+Best for playing audio files with automatic mixing.
+
+#### Playing Sound Effects (WAV/OGG)
+
+```c
+#include <kore3/mixer/mixer.h>
+#include <kore3/mixer/sound.h>
+
+// Initialize
+kore_mixer_init();
+
+// Create sound (pre-decoded, good for short effects)
+kore_mixer_sound *sound = kore_mixer_sound_create("sound.wav");
+// Or from memory
+// kore_mixer_sound *sound = kore_mixer_sound_create_from_buffer(data, size, KORE_MIXER_AUDIOFORMAT_WAV);
+
+// Set volume
+kore_mixer_sound_set_volume(sound, 0.8f);
+
+// Play
+kore_mixer_channel *channel = kore_mixer_play_sound(sound, false, 1.0f, false);
+// Parameters: sound, loop, pitch, unique
+
+// Control volume while playing
+kore_mixer_channel_set_volume(channel, 0.5f);
+
+// Stop
+kore_mixer_stop_sound(sound);
+
+// Destroy
+kore_mixer_sound_destroy(sound);
+```
+
+#### Playing Music (Streaming)
+
+```c
+#include <kore3/mixer/soundstream.h>
+
+// Create stream (decoded while playing, good for long audio)
+kore_mixer_sound_stream *stream = kore_mixer_sound_stream_create("music.ogg", true);
+// Parameters: filename, looping
+
+// Set volume
+kore_mixer_sound_stream_set_volume(stream, 0.5f);
+
+// Play
+kore_mixer_play_sound_stream(stream);
+
+// Control
+kore_mixer_sound_stream_set_looping(stream, true);
+float pos = kore_mixer_sound_stream_position(stream);  // Current position (seconds)
+float len = kore_mixer_sound_stream_length(stream);    // Total length (seconds)
+
+// Stop
+kore_mixer_stop_sound_stream(stream);
+
+// Reset to beginning
+kore_mixer_sound_stream_reset(stream);
+```
+
+#### Main Loop
+
+```c
+void update(void *data) {
+    kore_audio_update();  // Call every frame
+    // ...
+}
+```
+
+### Audio API (Low-level)
+
+For custom audio generation, directly provide audio samples.
+
+```c
+#include <kore3/audio/audio.h>
+
+void audio_callback(kore_audio_buffer *buffer, uint32_t samples, void *userdata) {
+    // Write samples directly to buffer->channels[0] (left) and buffer->channels[1] (right)
+    for (uint32_t i = 0; i < samples; i++) {
+        float sample = generate_sample();  // Custom generation
+        buffer->channels[0][buffer->write_location] = sample;
+        buffer->channels[1][buffer->write_location] = sample;
+        buffer->write_location = (buffer->write_location + 1) % buffer->data_size;
+    }
+}
+
+// Initialize
+kore_audio_init();
+kore_audio_set_callback(audio_callback, NULL);
+
+// Get sample rate
+uint32_t rate = kore_audio_samples_per_second();  // Usually 44100 or 48000
+
+// Cleanup
+kore_audio_shutdown();
+```
+
+### API Selection
+
+| API | Use Case | Features |
+|-----|----------|----------|
+| **Mixer** | Play audio files | High-level, auto-mixing, WAV/OGG support |
+| **Audio** | Custom audio generation | Low-level, direct sample control |
+
+### File Types
+
+| Type | Description |
+|------|-------------|
+| `kore_mixer_sound` | Sound effect (pre-decoded) |
+| `kore_mixer_sound_stream` | Stream (decoded while playing) |
+
+### Example: audio_test
+
+See `tests/audio_test/sources/main.c` for a complete example including:
+- OGG music playback via `kore_mixer_sound_stream`
+- Custom sine wave generation via `kore_audio_set_callback`
+- Play/Pause/Stop controls
+- Loop toggle and position tracking
+
+**Controls:**
+| Key | Function |
+|-----|----------|
+| `P` | Play/Pause music |
+| `S` | Stop music (reset to beginning) |
+| `L` | Toggle loop |
+| `I` | Show music info |
+| `1` | Toggle sine wave mode |
+| `2/3` | Increase/Decrease frequency |
+
+## SIMD Matrix Operations
+
+Kore provides SIMD-optimized matrix operations for improved performance.
+
+### SIMD Functions
+
+```c
+#include <kore3/math/matrix.h>
+
+// SIMD optimized versions (4-8x faster than scalar)
+kore_matrix4x4 kore_matrix4x4_multiply_simd(kore_matrix4x4 *a, kore_matrix4x4 *b);
+kore_float4    kore_matrix4x4_multiply_vector_simd(kore_matrix4x4 *a, kore_float4 b);
+void           kore_matrix4x4_transpose_simd(kore_matrix4x4 *matrix);
+```
+
+### Performance Benchmarks
+
+| Operation | Speedup |
+|-----------|---------|
+| Matrix Multiply (4x4) | ~8.4x |
+| Matrix-Vector Multiply | ~8.1x |
+| Matrix Transpose | ~2.2x |
+
+### Example: matrix_test
+
+See `tests/matrix_test/sources/main.c` for a complete example including:
+- Correctness tests comparing SIMD vs scalar results
+- Performance benchmarks with timing
+- All matrix operations (identity, rotation, translation, scale, multiply, transpose)
+
+**Build and Run:**
+```bash
+./make -g metal --kore . --from tests/matrix_test --compile
+./build/build/Release/Matrix-Test.app/Contents/MacOS/Matrix-Test
+```
+
+**Expected Output:**
+```
+=== Matrix Library Tests ===
+...
+=== SIMD Correctness Tests ===
+Testing kore_matrix4x4_multiply_simd() correctness...
+  PASSED
+...
+=== Performance Benchmarks ===
+=== Matrix Multiply Benchmark (1000000 iterations) ===
+  Speedup: 8.39x
+...
+ALL TESTS PASSED!
 ```
