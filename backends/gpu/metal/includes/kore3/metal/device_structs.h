@@ -1,6 +1,8 @@
 #ifndef KORE_METAL_DEVICE_STRUCTS_HEADER
 #define KORE_METAL_DEVICE_STRUCTS_HEADER
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -20,6 +22,7 @@ typedef struct kore_metal_execution_fence {
 typedef struct kore_metal_device {
 	void *device;
 	void *library;
+	void *command_queue;
 
 	kore_metal_execution_fence execution_fence;
 } kore_metal_device;

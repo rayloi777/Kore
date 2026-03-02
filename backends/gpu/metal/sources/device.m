@@ -67,8 +67,10 @@ static void wait_for_execution(kore_gpu_device *device, uint64_t index) {
 			id<MTLCommandBuffer> command_buffer = (__bridge id<MTLCommandBuffer>)execution_fence->command_buffers[fence_index];
 			[command_buffer waitUntilCompleted];
 
-			CFRelease(execution_fence->command_buffers[fence_index]);
-			execution_fence->command_buffers[fence_index] = NULL;
+			if (execution_fence->command_buffers[fence_index] != NULL) {
+				CFRelease(execution_fence->command_buffers[fence_index]);
+				execution_fence->command_buffers[fence_index] = NULL;
+			}
 
 			execution_fence->commend_buffer_execution_indices[fence_index] = 0;
 
@@ -179,6 +181,9 @@ void kore_metal_device_create(kore_gpu_device *device, const kore_gpu_device_wis
 	device->metal.device  = (__bridge_retained void *)metal_device;
 	device->metal.library = (__bridge_retained void *)metal_library;
 
+	id<MTLCommandQueue> command_queue = [metal_device newCommandQueue];
+	device->metal.command_queue = (__bridge_retained void *)command_queue;
+
 	create_execution_fence(device);
 }
 
@@ -203,14 +208,15 @@ void kore_metal_device_create_buffer(kore_gpu_device *device, const kore_gpu_buf
 	buffer->metal.buffer       = (__bridge_retained void *)metal_buffer;
 	buffer->metal.host_visible =
 	    (parameters->usage_flags & KORE_GPU_BUFFER_USAGE_CPU_WRITE) != 0 || (parameters->usage_flags & KORE_GPU_BUFFER_USAGE_CPU_READ) != 0;
-	buffer->metal.size   = parameters->size;
-	buffer->metal.device = device;
+	buffer->metal.size         = parameters->size;
+	buffer->metal.device       = device;
+	buffer->metal.ranges_count = 0;
 }
 
 void kore_metal_device_create_command_list(kore_gpu_device *device, kore_gpu_command_list_type type, kore_gpu_command_list *list) {
-	id<MTLDevice>       metal_device         = (__bridge id<MTLDevice>)device->metal.device;
-	id<MTLCommandQueue> command_queue        = [metal_device newCommandQueue];
-	list->metal.command_queue                = (__bridge_retained void *)command_queue;
+	(void)type;
+	id<MTLCommandQueue> command_queue = (__bridge id<MTLCommandQueue>)device->metal.command_queue;
+	list->metal.command_queue                = device->metal.command_queue;
 	list->metal.command_buffer               = (__bridge_retained void *)[command_queue commandBuffer];
 	list->metal.render_command_encoder       = NULL;
 	list->metal.compute_command_encoder      = NULL;
@@ -335,8 +341,7 @@ void kore_metal_device_execute_command_list(kore_gpu_device *device, kore_gpu_co
 	set_next_fence(device, list->metal.command_buffer);
 
 	id<MTLCommandQueue> command_queue = (__bridge id<MTLCommandQueue>)list->metal.command_queue;
-	command_buffer                    = [command_queue commandBuffer];
-	list->metal.command_buffer        = (__bridge_retained void *)[command_queue commandBuffer];
+	list->metal.command_buffer = (__bridge_retained void *)[command_queue commandBuffer];
 }
 
 void kore_metal_device_wait_until_idle(kore_gpu_device *device) {

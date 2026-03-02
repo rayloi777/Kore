@@ -149,8 +149,7 @@ static bool bake_font(kore_g2_font *font, kore_gpu_device *device, const int *co
 	kore_gpu_texture_parameters tex_params = {
 		.width = width,
 		.height = height,
-		.depth = 1,
-		.array_layers = 1,
+		.depth_or_array_layers = 1,
 		.mip_level_count = 1,
 		.sample_count = 1,
 		.usage = KORE_GPU_TEXTURE_USAGE_COPY_DST | KORE_GPU_TEXTURE_USAGE_SAMPLED,
@@ -176,7 +175,7 @@ bool kore_g2_font_init(kore_g2_font *font, kore_gpu_device *device, const char *
 bool kore_g2_font_init_with_glyphs(kore_g2_font *font, kore_gpu_device *device, const char *filename, float font_size,
                                    const int *codepoints, int codepoints_count) {
 	kore_file_reader file;
-	if (!kore_file_reader_open(&file, filename)) {
+	if (!kore_file_reader_open(&file, filename, KORE_FILE_TYPE_ASSET)) {
 		return false;
 	}
 	

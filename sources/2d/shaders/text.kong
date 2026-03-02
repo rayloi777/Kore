@@ -1,0 +1,42 @@
+struct vertex_in {
+    pos: float3;
+    tex_coord: float2;
+    col: float4;
+}
+
+struct vertex_out {
+    pos: float4;
+    tex_coord: float2;
+    col: float4;
+}
+
+#[set(textures)]
+const tex: tex2d;
+
+#[set(textures)]
+const sam: sampler;
+
+fun pos(input: vertex_in): vertex_out {
+    var output: vertex_out;
+    output.pos = float4(input.pos.x, input.pos.y, input.pos.z, 1.0);
+    output.tex_coord = input.tex_coord;
+    output.col = input.col;
+    return output;
+}
+
+fun pix(input: vertex_out): float4 {
+    var tex_color: float4 = sample(tex, sam, input.tex_coord);
+    var alpha: float = tex_color.r * input.col.a;
+    return float4(input.col.r, input.col.g, input.col.b, alpha);
+}
+
+#[pipe]
+struct text_pipeline {
+    vertex = pos;
+    fragment = pix;
+    format = framebuffer_format();
+    blend_source = blend_source_alpha;
+    blend_destination = inv_blend_source_alpha;
+    blend_source_alpha = blend_one;
+    blend_destination_alpha = inv_blend_source_alpha;
+}

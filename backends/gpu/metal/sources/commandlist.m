@@ -110,6 +110,8 @@ void kore_metal_command_list_begin_render_pass(kore_gpu_command_list *list, cons
 }
 
 void kore_metal_command_list_end_render_pass(kore_gpu_command_list *list) {
+	if (list->metal.render_command_encoder == NULL) return;
+	
 	id<MTLRenderCommandEncoder> render_command_encoder = (__bridge id<MTLRenderCommandEncoder>)list->metal.render_command_encoder;
 	[render_command_encoder endEncoding];
 
