@@ -372,26 +372,10 @@ static bool loadImage(kore_image_read_callbacks callbacks, void *user_data, cons
 
 		for (int y = 0; y < *height; ++y) {
 			for (int x = 0; x < *width; ++x) {
-				float r, g, b, a;
-				if (comp == 1) {
-					float gray = uncompressed[y * *width + x] / 255.0f;
-					r = g = b = gray;
-					a = 1.0f;
-				} else if (comp == 2) {
-					float gray = uncompressed[y * *width * 2 + x * 2 + 0] / 255.0f;
-					r = g = b = gray;
-					a = uncompressed[y * *width * 2 + x * 2 + 1] / 255.0f;
-				} else if (comp == 3) {
-					r = uncompressed[y * *width * 3 + x * 3 + 0] / 255.0f;
-					g = uncompressed[y * *width * 3 + x * 3 + 1] / 255.0f;
-					b = uncompressed[y * *width * 3 + x * 3 + 2] / 255.0f;
-					a = 1.0f;
-				} else {
-					r = uncompressed[y * *width * 4 + x * 4 + 0] / 255.0f;
-					g = uncompressed[y * *width * 4 + x * 4 + 1] / 255.0f;
-					b = uncompressed[y * *width * 4 + x * 4 + 2] / 255.0f;
-					a = uncompressed[y * *width * 4 + x * 4 + 3] / 255.0f;
-				}
+				float r = uncompressed[y * *width * 4 + x * 4 + 0] / 255.0f;
+				float g = uncompressed[y * *width * 4 + x * 4 + 1] / 255.0f;
+				float b = uncompressed[y * *width * 4 + x * 4 + 2] / 255.0f;
+				float a = uncompressed[y * *width * 4 + x * 4 + 3] / 255.0f;
 				r *= a;
 				g *= a;
 				b *= a;
