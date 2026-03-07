@@ -372,13 +372,33 @@ static bool loadImage(kore_image_read_callbacks callbacks, void *user_data, cons
 
 		for (int y = 0; y < *height; ++y) {
 			for (int x = 0; x < *width; ++x) {
-				float r = uncompressed[y * *width * 4 + x * 4 + 0] / 255.0f;
-				float g = uncompressed[y * *width * 4 + x * 4 + 1] / 255.0f;
-				float b = uncompressed[y * *width * 4 + x * 4 + 2] / 255.0f;
-				float a = uncompressed[y * *width * 4 + x * 4 + 3] / 255.0f;
+				float r, g, b, a;
+
+				if (comp == 1) {
+					float gray = uncompressed[y * *width * 4 + x * 4 + 0] / 255.0f;
+					r = g = b = gray;
+					a = 1.0f;
+				} else if (comp == 2) {
+					float gray = uncompressed[y * *width * 4 + x * 4 + 0] / 255.0f;
+					a = uncompressed[y * *width * 4 + x * 4 + 3] / 255.0f;
+					r = g = b = gray;
+				} else if (comp == 3) {
+					r = uncompressed[y * *width * 4 + x * 4 + 0] / 255.0f;
+					g = uncompressed[y * *width * 4 + x * 4 + 1] / 255.0f;
+					b = uncompressed[y * *width * 4 + x * 4 + 2] / 255.0f;
+					a = uncompressed[y * *width * 4 + x * 4 + 3] / 255.0f;
+					if (a < 0.01f) a = 1.0f;
+				} else {
+					r = uncompressed[y * *width * 4 + x * 4 + 0] / 255.0f;
+					g = uncompressed[y * *width * 4 + x * 4 + 1] / 255.0f;
+					b = uncompressed[y * *width * 4 + x * 4 + 2] / 255.0f;
+					a = uncompressed[y * *width * 4 + x * 4 + 3] / 255.0f;
+				}
+
 				r *= a;
 				g *= a;
 				b *= a;
+
 				output[y * stride + x * 4 + 0] = (uint8_t)kore_round(r * 255.0f);
 				output[y * stride + x * 4 + 1] = (uint8_t)kore_round(g * 255.0f);
 				output[y * stride + x * 4 + 2] = (uint8_t)kore_round(b * 255.0f);
