@@ -12,8 +12,10 @@
 void kore_metal_texture_set_name(kore_gpu_texture *texture, const char *name) {}
 
 void kore_metal_texture_destroy(kore_gpu_texture *texture) {
-	CFRelease(texture->metal.texture);
-	texture->metal.texture = NULL;
+	if (texture->metal.texture != NULL) {
+		CFRelease(texture->metal.texture);
+		texture->metal.texture = NULL;
+	}
 }
 
 void kore_metal_texture_view_create(kore_gpu_device *device, kore_gpu_texture *texture, kore_gpu_texture_view *view) {

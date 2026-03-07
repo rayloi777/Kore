@@ -5,6 +5,7 @@
 #include <kore3/gpu/device.h>
 #include <kore3/gpu/texture.h>
 #include <kore3/io/filereader.h>
+#include <kore3/system.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -137,6 +138,8 @@ static bool bake_font(kore_g2_font *font, kore_gpu_device *device, const int *co
 	
 	int result = stbtt_BakeFontBitmap(font->font_data, offset, font->font_size, pixels, width, height, sorted_codepoints[0], total_glyphs, font->baked_chars);
 	
+	kore_log(KORE_LOG_LEVEL_INFO, "stbtt_BakeFontBitmap result: %d, total_glyphs: %d", result, total_glyphs);
+	
 	if (result <= 0) {
 		free(pixels);
 		free(sorted_codepoints);
@@ -216,6 +219,8 @@ void kore_g2_font_destroy(kore_g2_font *font) {
 }
 
 bool kore_g2_font_get_baked_quad(kore_g2_font *font, int codepoint, float *xpos, float *ypos, kore_g2_font_aligned_quad *quad) {
+	if (!font->baked_chars) return false;
+	
 	stbtt_bakedchar *baked_chars = (stbtt_bakedchar *)font->baked_chars;
 	
 	int char_index = find_char_index(font, codepoint);

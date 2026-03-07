@@ -1,14 +1,17 @@
 struct vertex_in {
     pos: float3;
-    tex_coord: float2;
-    col: float4;
+    uv: float2;
 }
 
 struct vertex_out {
     pos: float4;
-    tex_coord: float2;
-    col: float4;
+    uv: float2;
 }
+
+#[set(mvp)]
+const constants: {
+    mvp: float4x4;
+};
 
 #[set(textures)]
 const tex: tex2d;
@@ -19,24 +22,23 @@ const sam: sampler;
 #[vertex]
 fun pos(input: vertex_in): vertex_out {
     var output: vertex_out;
-    output.pos = float4(input.pos.x, input.pos.y, input.pos.z, 1.0);
-    output.tex_coord = input.tex_coord;
-    output.col = input.col;
+    output.pos = constants.mvp * float4(input.pos, 1.0);
+    output.uv = input.uv;
     return output;
 }
 
 #[fragment]
 fun pix(input: vertex_out): float4 {
-    var tex_color: float4 = sample(tex, sam, input.tex_coord);
-    var color: float4;
-    color.xyz = input.col.xyz;
-    color.w = tex_color.x * input.col.w;
+    var color: float4 = sample(tex, sam, input.uv);
     return color;
 }
 
 #[pipe]
-struct text_pipeline {
+struct pipeline {
     vertex = pos;
     fragment = pix;
+    depth_stencil_format = TEXTURE_FORMAT_DEPTH32_FLOAT;
+    depth_write = true;
+    depth_compare = COMPARE_LESS;
     format = framebuffer_format();
 }
