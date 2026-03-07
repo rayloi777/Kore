@@ -38,9 +38,22 @@ static void update(void *data) {
     float fb_width = (float)framebuffer->width;
     float fb_height = (float)framebuffer->height;
     float aspect = fb_width / fb_height;
+    float fov = 3.14159f / 4.0f;
     
-    kore_matrix4x4 proj = kore_matrix4x4_perspective(3.14159f / 4.0f, aspect, 0.1f, 100.0f);
-    kore_matrix4x4 mvp = proj;
+    kore_float3 eye = {0, 0, 4};
+    kore_float3 center = {0, 0, 0};
+    kore_float3 up = {0, 1, 0};
+    
+    kore_matrix4x4 projection = kore_matrix4x4_perspective(fov, aspect, 0.1f, 100.0f);
+    kore_matrix4x4 view = kore_matrix4x4_look_at(eye, center, up);
+    kore_matrix4x4 model = kore_matrix4x4_identity();
+    
+    kore_matrix4x4 mvp = kore_matrix4x4_identity();
+    mvp = kore_matrix4x4_multiply(&mvp, &projection);
+    mvp = kore_matrix4x4_multiply(&mvp, &view);
+    mvp = kore_matrix4x4_multiply(&mvp, &model);
+
+    //kore_matrix4x4 mvp = kore_matrix4x4_translation(0.5f, 0, 0.5f); 
     
     constants_type uniforms = {0};
     for (int i = 0; i < 16; i++) {
@@ -53,8 +66,6 @@ static void update(void *data) {
         constants_type_buffer_unlock(&uniform_buffer);
     }
     
-    kore_gpu_texture *framebuffer = kore_gpu_device_get_framebuffer(&device);
-
     kore_gpu_color clear_color = {
         .r = 0.1f,
         .g = 0.1f,

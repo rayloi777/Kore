@@ -330,13 +330,13 @@ void update(void *data) {
 
 使用 `kore_matrix4x4_perspective()` 時，物體不可見或變形。
 
-### 11.2 根本原因
+### 11.2 參考來源
 
-Metal 的 NDC Z 座標範圍是 [0, 1]，與 OpenGL 的 [-1, 1] 不同。
+參考 Kha 官方範例: https://github.com/Kode/Kore-Samples/blob/main/04_textured_cube/sources/main.c
 
-### 11.3 修復方案
+### 11.3 Perspective Matrix (OpenGL 格式)
 
-修改 `sources/math/matrix.c` 中的 `kore_matrix4x4_perspective()`:
+Kha 使用的矩陣格式，與 OpenGL 相同:
 
 ```c
 kore_matrix4x4 kore_matrix4x4_perspective(float fov, float aspect, float near, float far) {
@@ -347,29 +347,73 @@ kore_matrix4x4 kore_matrix4x4_perspective(float fov, float aspect, float near, f
         .m = {
             uw, 0, 0, 0,
             0, uh, 0, 0,
-            0, 0, far / (far - near), 1,        // m[2][2], m[2][3]
-            0, 0, -far * near / (far - near), 0  // m[3][2]
+            0, 0, (far + near) / (near - far), -1,
+            0, 0, (2 * far * near) / (near - far), 0
         }
     };
     return m;
 }
 ```
 
-### 11.4 關鍵點
+### 11.4 MVP 矩陣順序
+
+```c
+kore_matrix4x4 proj = kore_matrix4x4_perspective(fov, aspect, 0.1f, 100.0f);
+kore_matrix4x4 view = kore_matrix4x4_look_at(eye, center, up);
+kore_matrix4x4 model = kore_matrix4x4_identity();
+
+kore_matrix4x4 mvp = model;
+mvp = kore_matrix4x4_multiply(&mvp, &view);   // M * V
+mvp = kore_matrix4x4_multiply(&mvp, &proj);   // (M * V) * P
+```
+
+### 11.5 LookAt 函數
+
+```c
+kore_matrix4x4 kore_matrix4x4_look_at(kore_float3 eye, kore_float3 at, kore_float3 up) {
+    kore_float3 zaxis = kore_float3_normalize(kore_float3_sub(at, eye));
+    kore_float3 xaxis = kore_float3_normalize(kore_float3_cross(zaxis, up));
+    kore_float3 yaxis = kore_float3_cross(xaxis, zaxis);
+    
+    kore_matrix4x4 m = {
+        xaxis.x, yaxis.x, -zaxis.x, 0,
+        xaxis.y, yaxis.y, -zaxis.y, 0,
+        xaxis.z, yaxis.z, -zaxis.z, 0,
+        -kore_float3_dot(xaxis, eye), -kore_float3_dot(yaxis, eye), kore_float3_dot(zaxis, eye), 1
+    };
+    return m;
+}
+```
+
+### 11.6 使用範例
+
+**Triangle test:**
+```c
+kore_float3 eye = {0, 0, 4};
+kore_float3 center = {0, 0, 0};
+kore_float3 up = {0, 1, 0};
+
+kore_matrix4x4 proj = kore_matrix4x4_perspective(fov, aspect, 0.001f, 1000.0f);
+kore_matrix4x4 view = kore_matrix4x4_look_at(eye, center, up);
+kore_matrix4x4 model = kore_matrix4x4_identity();
+```
+
+**Cube test:**
+```c
+kore_float3 eye = {4, 3, 3};
+kore_float3 center = {0, 0, 0};
+kore_float3 up = {0, 1, 0};
+```
+
+### 11.7 關鍵點
 
 | 元素 | 值 | 說明 |
 |------|-----|------|
 | m[0][0] | uw | 水平縮放 |
 | m[1][1] | uh | 垂直縮放 |
-| m[2][2] | far / (far - near) | Z 映射 |
-| m[2][3] | 1 | Z 方向 (Metal) |
-| m[3][2] | -far*near/(far-near) | Z 偏移 |
-
-### 11.5 調試記錄
-
-1. **初始狀態**: identity matrix 工作正常
-2. **加入 perspective**: 物體消失
-3. **修改 m[2][3]**: 從 -1 改為 1，解決問題
+| m[2][2] | (far+near)/(near-far) | Z 映射 |
+| m[2][3] | -1 | OpenGL Z 方向 |
+| m[3][2] | 2*far*near/(near-far) | Z 偏移 |
 
 ---
 

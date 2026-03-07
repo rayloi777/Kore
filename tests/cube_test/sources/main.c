@@ -92,9 +92,16 @@ static void update(void *data) {
     float fov = 3.14159f / 4.0f;
     float aspect = fb_width / fb_height;
     
-    kore_matrix4x4 proj = kore_matrix4x4_perspective(fov, aspect, 0.1f, 100.0f);
-    kore_matrix4x4 scale = kore_matrix4x4_scale(0.5f, 0.5f, 0.5f);
-    kore_matrix4x4 mvp = kore_matrix4x4_identity();
+	kore_matrix4x4 projection = kore_matrix4x4_perspective(fov, aspect, 0.1f, 100.0f);
+	kore_float3    v0         = {4, 3, 3};
+	kore_float3    v1         = {0, 0, 0};
+	kore_float3    v2         = {0, 1, 0};
+	kore_matrix4x4 view       = kore_matrix4x4_look_at(v0, v1, v2);
+	kore_matrix4x4 model      = kore_matrix4x4_identity();
+	kore_matrix4x4 mvp        = kore_matrix4x4_identity();
+	mvp                       = kore_matrix4x4_multiply(&mvp, &projection);
+	mvp                       = kore_matrix4x4_multiply(&mvp, &view);
+	mvp                       = kore_matrix4x4_multiply(&mvp, &model);
     
     constants_type uniforms = {0};
     for (int i = 0; i < 16; i++) {

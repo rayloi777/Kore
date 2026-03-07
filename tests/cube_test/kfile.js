@@ -6,8 +6,8 @@ project.addFile('sources/**');
 project.addKongDir('shaders');
 project.setDebugDir('deployment');
 
-project.addIncludeDir('../../build/Kong-osx-metal');
-project.addFile('../../build/Kong-osx-metal/kong.m');
+project.addIncludeDir('../../build/Kong-osx-metal-cube');
+project.addFile('../../build/Kong-osx-metal-cube/kong.m');
 
 project.flatten();
 
