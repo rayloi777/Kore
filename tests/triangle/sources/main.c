@@ -34,14 +34,13 @@ static uint16_t indices[3] = {
 };
 
 static void update(void *data) {
-    kore_matrix4x4 mvp = {
-        .m = {
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f,
-            0.0f, 0.0f, 0.0f, 1.0f,
-        }
-    };
+    kore_gpu_texture *framebuffer = kore_gpu_device_get_framebuffer(&device);
+    float fb_width = (float)framebuffer->width;
+    float fb_height = (float)framebuffer->height;
+    float aspect = fb_width / fb_height;
+    
+    kore_matrix4x4 proj = kore_matrix4x4_perspective(3.14159f / 4.0f, aspect, 0.1f, 100.0f);
+    kore_matrix4x4 mvp = proj;
     
     constants_type uniforms = {0};
     for (int i = 0; i < 16; i++) {

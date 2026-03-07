@@ -234,21 +234,14 @@ kore_matrix4x4 kore_matrix4x4_perspective(float fov, float aspect, float near, f
 	float uh = 1.0f / tanf(fov / 2.0f);
 	float uw = uh / aspect;
 	
-#if defined(KORE_METAL) || defined(KORE_VULKAN)
 	kore_matrix4x4 m = {
-		uw, 0, 0, 0,
-		0, uh, 0, 0,
-		0, 0, near / (near - far), -1,
-		0, 0, near * far / (near - far), 0
+		.m = {
+			uw, 0, 0, 0,
+			0, uh, 0, 0,
+			0, 0, far / (far - near), 1,
+			0, 0, -far * near / (far - near), 0
+		}
 	};
-#else
-	kore_matrix4x4 m = {
-		uw, 0, 0, 0,
-		0, uh, 0, 0,
-		0, 0, (far + near) / (near - far), -1,
-		0, 0, 2 * far * near / (near - far), 0
-	};
-#endif
 	return m;
 }
 
