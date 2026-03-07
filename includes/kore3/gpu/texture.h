@@ -40,6 +40,7 @@ struct kore_gpu_texture;
 typedef struct kore_gpu_texture {
 	uint32_t                width;
 	uint32_t                height;
+	uint32_t                mip_level_count;
 	kore_gpu_texture_format format;
 
 	KORE_GPU_IMPL(texture);

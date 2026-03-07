@@ -24,7 +24,7 @@ void kore_metal_texture_view_create(kore_gpu_device *device, kore_gpu_texture *t
 	view->dimension = KORE_GPU_TEXTURE_VIEW_DIMENSION_2D;
 	view->aspect = KORE_GPU_IMAGE_COPY_ASPECT_ALL;
 	view->base_mip_level = 0;
-	view->mip_level_count = 1;
+	view->mip_level_count = texture->mip_level_count;
 	view->base_array_layer = 0;
 	view->array_layer_count = 1;
 }

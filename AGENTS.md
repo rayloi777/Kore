@@ -24,13 +24,13 @@ Cross-platform C game engine with multi-GPU support (Metal, Vulkan, OpenGL, Dire
 | Math | `includes/kore3/math/` (SIMD in `sources/math/`) |
 | Audio | `includes/kore3/mixer/` or `audio/` |
 | Backend impl | `backends/gpu/metal/`, `backends/system/macos/` |
-| Tests | `tests/cube_test/`, `tests/texture_test/`, `tests/audio_test/` |
+| Tests | `tests/cube_test/`, `tests/texture_test/`, `tests/audio_test/`, `tests/mipmap_test/` |
 
 ## BUILD
 ```bash
 ./get_dlc                    # Init submodules
-./make -g metal --kore . --from tests/texture_test --compile
-open build/build/Release/Texture-Test.app
+./make -g metal --kore . --from tests/mipmap_test --compile
+open build/build/Release/Mipmap-Test.app
 ```
 
 ## CODE STYLE

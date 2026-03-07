@@ -284,6 +284,7 @@ void kore_metal_device_create_texture(kore_gpu_device *device, const kore_gpu_te
 
 	texture->width  = parameters->width;
 	texture->height = parameters->height;
+	texture->mip_level_count = parameters->mip_level_count;
 }
 
 static kore_gpu_texture framebuffer;
