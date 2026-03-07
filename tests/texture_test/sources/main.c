@@ -41,8 +41,8 @@ static void update(void *data) {
     if (first_update) {
         kore_gpu_image_copy_buffer source = {
             .buffer         = &image_buffer,
-            .bytes_per_row  = kore_gpu_device_align_texture_row_bytes(&device, 250 * 4),
-            .rows_per_image = 250,
+            .bytes_per_row  = kore_gpu_device_align_texture_row_bytes(&device, 512 * 4),
+            .rows_per_image = 512,
         };
 
         kore_gpu_image_copy_texture destination = {
@@ -50,7 +50,7 @@ static void update(void *data) {
             .mip_level = 0,
         };
 
-        kore_gpu_command_list_copy_buffer_to_texture(&list, &source, &destination, 250, 250, 1);
+        kore_gpu_command_list_copy_buffer_to_texture(&list, &source, &destination, 512, 512, 1);
     }
 
     kore_gpu_texture *framebuffer = kore_gpu_device_get_framebuffer(&device);
@@ -114,20 +114,20 @@ int kickstart(int argc, char **argv) {
     kore_gpu_device_create_command_list(&device, KORE_GPU_COMMAND_LIST_TYPE_GRAPHICS, &list);
 
     kore_gpu_buffer_parameters buffer_params = {
-        .size        = kore_gpu_device_align_texture_row_bytes(&device, 250 * 4) * 250,
+        .size        = kore_gpu_device_align_texture_row_bytes(&device, 512 * 4) * 512,
         .usage_flags = KORE_GPU_BUFFER_USAGE_CPU_WRITE | KORE_GPU_BUFFER_USAGE_COPY_SRC,
     };
     kore_gpu_device_create_buffer(&device, &buffer_params, &image_buffer);
 
     kore_image image;
-    kore_image_init_from_file_with_stride(&image, kore_gpu_buffer_lock_all(&image_buffer), "parrot.png",
-                                          kore_gpu_device_align_texture_row_bytes(&device, 250 * 4));
+    kore_image_init_from_file_with_stride(&image, kore_gpu_buffer_lock_all(&image_buffer), "haxe.png",
+                                          kore_gpu_device_align_texture_row_bytes(&device, 512 * 4));
     kore_image_destroy(&image);
     kore_gpu_buffer_unlock(&image_buffer);
 
     kore_gpu_texture_parameters tex_params = {
-        .width                 = 250,
-        .height                = 250,
+        .width                 = 512,
+        .height                = 512,
         .depth_or_array_layers = 1,
         .mip_level_count       = 1,
         .sample_count          = 1,

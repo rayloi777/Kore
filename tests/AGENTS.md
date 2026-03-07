@@ -30,7 +30,7 @@ tests/
 |------|---------|-------------|
 | cube_test | `./make -g metal ... --from tests/cube_test` | 3D rotation, MVP, depth |
 | triangle | `./make -g metal ... --from tests/triangle` | 2D colored triangle |
-| texture_test | `./make -g metal ... --from tests/texture_test` | Texture upload |
+| texture_test | `./make -g metal ... --from tests/texture_test` | Texture upload, RGBA8, Kongruent shader |
 | audio_test | `./make -g metal ... --from tests/audio_test` | OGG + sine wave |
 | matrix_test | `./make -g metal ... --from tests/matrix_test` | SIMD benchmarks |
 

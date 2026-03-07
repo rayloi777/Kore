@@ -24,13 +24,13 @@ Cross-platform C game engine with multi-GPU support (Metal, Vulkan, OpenGL, Dire
 | Math | `includes/kore3/math/` (SIMD in `sources/math/`) |
 | Audio | `includes/kore3/mixer/` or `audio/` |
 | Backend impl | `backends/gpu/metal/`, `backends/system/macos/` |
-| Tests | `tests/cube_test/`, `tests/audio_test/` |
+| Tests | `tests/cube_test/`, `tests/texture_test/`, `tests/audio_test/` |
 
 ## BUILD
 ```bash
 ./get_dlc                    # Init submodules
-./make -g metal --kore . --from tests/cube_test --compile
-open build/build/Release/Cube-Test.app
+./make -g metal --kore . --from tests/texture_test --compile
+open build/build/Release/Texture-Test.app
 ```
 
 ## CODE STYLE
@@ -56,3 +56,5 @@ open build/build/Release/Cube-Test.app
 - Use Kongruent shaders (.kong files) for GPU programs
 - Matrix multiply: `multiply(a,b)` = `b * a` (reverse order)
 - Use `translation()` + `perspective()` instead of `look_at()` for camera (look_at has issues)
+- Metal texture sampling requires `KORE_GPU_TEXTURE_USAGE_SAMPLED` flag in texture creation
+- Image loading: stbi converts all formats to RGBA when comp=4, RGB images need alpha set to opaque
