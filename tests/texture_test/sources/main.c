@@ -14,100 +14,92 @@
 #include <stdint.h>
 #include <string.h>
 
-static const int width  = 1920;
-static const int height = 1080;
-
-typedef struct {
-    float x, y, z;
-    float u, v;
-} Vertex;
+static const int width  = 800;
+static const int height = 600;
 
 static kore_gpu_device       device;
 static kore_gpu_command_list list;
-static vertex_in_buffer     vertex_buffer;
-static kore_gpu_buffer       index_buffer;
-static kore_gpu_buffer       uniform_buffer;
-static mvp_set               uniform_set;
-static kore_gpu_texture      depth_texture;
+static vertex_in_buffer      vertices;
+static kore_gpu_buffer       indices;
+static kore_gpu_buffer       image_buffer;
 static kore_gpu_texture      test_texture;
 static kore_gpu_texture_view test_texture_view;
-static kore_gpu_sampler     test_sampler;
-static textures_set         texture_set;
+static kore_gpu_sampler      sampler;
+static kore_gpu_buffer       constants;
+static everything_set        texture_set;
 
-static Vertex vertices[4] = {
-    { -0.5f, -0.5f, 0.0f, 0.0f, 0.0f },
-    {  0.5f, -0.5f, 0.0f, 1.0f, 0.0f },
-    {  0.5f,  0.5f, 0.0f, 1.0f, 1.0f },
-    { -0.5f,  0.5f, 0.0f, 0.0f, 1.0f },
-};
-
-static uint16_t indices[6] = {
-    0, 1, 2,
-    0, 2, 3,
-};
+static bool     first_update = true;
+static uint64_t update_index = 0;
 
 static void update(void *data) {
-    kore_matrix4x4 mvp = kore_matrix4x4_identity();
-    
-    constants_type uniforms = {
-        .mvp = mvp
-    };
-    
-    {
-        constants_type *ptr = constants_type_buffer_lock(&uniform_buffer, 0, 1);
-        if (ptr) {
-            *ptr = uniforms;
-            constants_type_buffer_unlock(&uniform_buffer);
-        }
-    }
-    
-    kore_gpu_texture *framebuffer = kore_gpu_device_get_framebuffer(&device);
+    kore_matrix3x3 mvp = kore_matrix3x3_rotation_z((float)kore_time());
 
-    kore_gpu_color clear_color = {
-        .r = 0.2f,
-        .g = 0.2f,
-        .b = 0.3f,
-        .a = 1.0f,
-    };
+    constants_type *constants_data = constants_type_buffer_lock(&constants, update_index % KORE_GPU_MAX_FRAMEBUFFERS, 1);
+    constants_data->mvp            = mvp;
+    constants_type_buffer_unlock(&constants);
+
+    if (first_update) {
+        kore_gpu_image_copy_buffer source = {
+            .buffer         = &image_buffer,
+            .bytes_per_row  = kore_gpu_device_align_texture_row_bytes(&device, 250 * 4),
+            .rows_per_image = 250,
+        };
+
+        kore_gpu_image_copy_texture destination = {
+            .texture   = &test_texture,
+            .mip_level = 0,
+        };
+
+        kore_gpu_command_list_copy_buffer_to_texture(&list, &source, &destination, 250, 250, 1);
+    }
+
+    kore_gpu_texture *framebuffer = kore_gpu_device_get_framebuffer(&device);
 
     kore_gpu_render_pass_parameters parameters = {
         .color_attachments_count = 1,
         .color_attachments = {
             {
                 .load_op = KORE_GPU_LOAD_OP_CLEAR,
-                .clear_value = clear_color,
+                .clear_value = {
+                    .r = 0.0f,
+                    .g = 0.0f,
+                    .b = 0.0f,
+                    .a = 1.0f,
+                },
                 .texture = {
-                    .texture = framebuffer,
+                    .texture           = framebuffer,
                     .array_layer_count = 1,
-                    .mip_level_count = 1,
-                    .format = KORE_GPU_TEXTURE_FORMAT_BGRA8_UNORM,
-                    .dimension = KORE_GPU_TEXTURE_VIEW_DIMENSION_2D,
+                    .mip_level_count   = 1,
+                    .format            = kore_gpu_device_framebuffer_format(&device),
+                    .dimension         = KORE_GPU_TEXTURE_VIEW_DIMENSION_2D,
                 },
             },
-        },
-        .depth_stencil_attachment = {
-            .texture = &depth_texture,
-            .depth_load_op = KORE_GPU_LOAD_OP_CLEAR,
-            .depth_store_op = KORE_GPU_STORE_OP_STORE,
-            .depth_clear_value = 1.0f,
-            .stencil_load_op = KORE_GPU_LOAD_OP_LOAD,
-            .stencil_store_op = KORE_GPU_STORE_OP_DISCARD,
-            .stencil_clear_value = 0,
         },
     };
     kore_gpu_command_list_begin_render_pass(&list, &parameters);
 
     kong_set_render_pipeline_pipeline(&list);
-    kong_set_vertex_buffer_vertex_in(&list, &vertex_buffer);
-    kong_set_descriptor_set_mvp(&list, &uniform_set);
-    kong_set_descriptor_set_textures(&list, &texture_set);
 
-    kore_gpu_command_list_set_index_buffer(&list, &index_buffer, KORE_GPU_INDEX_FORMAT_UINT16, 0);
-    kore_gpu_command_list_draw_indexed(&list, 6, 1, 0, 0, 0);
+    kong_set_descriptor_set_everything(&list, &texture_set, update_index % KORE_GPU_MAX_FRAMEBUFFERS);
+
+    kong_set_vertex_buffer_vertex_in(&list, &vertices);
+
+    kore_gpu_command_list_set_index_buffer(&list, &indices, KORE_GPU_INDEX_FORMAT_UINT16, 0);
+
+    kore_gpu_command_list_draw_indexed(&list, 3, 1, 0, 0, 0);
 
     kore_gpu_command_list_end_render_pass(&list);
+
     kore_gpu_command_list_present(&list);
+
     kore_gpu_device_execute_command_list(&device, &list);
+
+    if (first_update) {
+        kore_gpu_buffer_destroy(&image_buffer);
+        first_update = false;
+    }
+
+    update_index += 1;
 }
 
 int kickstart(int argc, char **argv) {
@@ -121,97 +113,106 @@ int kickstart(int argc, char **argv) {
 
     kore_gpu_device_create_command_list(&device, KORE_GPU_COMMAND_LIST_TYPE_GRAPHICS, &list);
 
-    kore_gpu_buffer_parameters vertex_params = {
-        .size = sizeof(vertices),
-        .usage_flags = KORE_GPU_BUFFER_USAGE_VERTEX | KORE_GPU_BUFFER_USAGE_COPY_DST,
+    kore_gpu_buffer_parameters buffer_params = {
+        .size        = kore_gpu_device_align_texture_row_bytes(&device, 250 * 4) * 250,
+        .usage_flags = KORE_GPU_BUFFER_USAGE_CPU_WRITE | KORE_GPU_BUFFER_USAGE_COPY_SRC,
     };
-    kore_gpu_device_create_buffer(&device, &vertex_params, &vertex_buffer.buffer);
-    
-    {
-        vertex_in *ptr = kong_vertex_in_buffer_lock(&vertex_buffer);
-        memcpy(ptr, vertices, sizeof(vertices));
-        kong_vertex_in_buffer_unlock(&vertex_buffer);
-    }
-
-    kore_gpu_buffer_parameters index_params = {
-        .size = sizeof(indices),
-        .usage_flags = KORE_GPU_BUFFER_USAGE_INDEX | KORE_GPU_BUFFER_USAGE_COPY_DST,
-    };
-    kore_gpu_device_create_buffer(&device, &index_params, &index_buffer);
-    
-    {
-        void *ptr = kore_gpu_buffer_lock_all(&index_buffer);
-        memcpy(ptr, indices, sizeof(indices));
-        kore_gpu_buffer_unlock_all(&index_buffer);
-    }
-
-    constants_type_buffer_create(&device, &uniform_buffer, 1);
-
-    kore_gpu_texture_parameters depth_params = {
-        .width = width,
-        .height = height,
-        .depth_or_array_layers = 1,
-        .mip_level_count = 1,
-        .sample_count = 1,
-        .dimension = KORE_GPU_TEXTURE_DIMENSION_2D,
-        .format = KORE_GPU_TEXTURE_FORMAT_DEPTH32_FLOAT,
-        .usage = KORE_GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
-    };
-    kore_gpu_device_create_texture(&device, &depth_params, &depth_texture);
+    kore_gpu_device_create_buffer(&device, &buffer_params, &image_buffer);
 
     kore_image image;
-    uint8_t *image_memory = (uint8_t *)malloc(512 * 512 * 4);
-    
-    size_t image_size = kore_image_init_from_file(&image, image_memory, "haxe.png");
-    
-    if (image_size == 0) {
-        for (int i = 0; i < 512 * 512; i++) {
-            int checker = ((i % 512) / 32 + (i / 512) / 32) % 2;
-            image_memory[i * 4 + 0] = checker ? 255 : 0;
-            image_memory[i * 4 + 1] = checker ? 0 : 255;
-            image_memory[i * 4 + 2] = 0;
-            image_memory[i * 4 + 3] = 255;
-        }
-        image.width = 512;
-        image.height = 512;
-    }
-    image.depth = 1;
-    image.format = KORE_IMAGE_FORMAT_RGBA32;
-    image.data = image_memory;
+    kore_image_init_from_file_with_stride(&image, kore_gpu_buffer_lock_all(&image_buffer), "parrot.png",
+                                          kore_gpu_device_align_texture_row_bytes(&device, 250 * 4));
+    kore_image_destroy(&image);
+    kore_gpu_buffer_unlock(&image_buffer);
 
     kore_gpu_texture_parameters tex_params = {
-        .width = image.width,
-        .height = image.height,
+        .width                 = 250,
+        .height                = 250,
         .depth_or_array_layers = 1,
-        .mip_level_count = 1,
-        .sample_count = 1,
-        .dimension = KORE_GPU_TEXTURE_DIMENSION_2D,
-        .format = KORE_GPU_TEXTURE_FORMAT_RGBA8_UNORM,
-        .usage = KORE_GPU_TEXTURE_USAGE_SAMPLED | KORE_GPU_TEXTURE_USAGE_COPY_DST,
+        .mip_level_count       = 1,
+        .sample_count          = 1,
+        .dimension             = KORE_GPU_TEXTURE_DIMENSION_2D,
+        .format                = KORE_GPU_TEXTURE_FORMAT_RGBA8_UNORM,
+        .usage                 = KORE_GPU_TEXTURE_USAGE_COPY_DST | KORE_GPU_TEXTURE_USAGE_SAMPLED,
     };
     kore_gpu_device_create_texture(&device, &tex_params, &test_texture);
 
-    kore_gpu_texture_upload(&device, &test_texture, kore_image_get_pixels(&image), image.width, image.height);
-
-    kore_image_destroy(&image);
-    free(image_memory);
-
     kore_gpu_texture_view_create(&device, &test_texture, &test_texture_view);
 
-    kore_gpu_device_create_default_sampler(&device, &test_sampler);
+    kore_gpu_sampler_parameters sampler_params = {
+        .address_mode_u = KORE_GPU_ADDRESS_MODE_REPEAT,
+        .address_mode_v = KORE_GPU_ADDRESS_MODE_REPEAT,
+        .address_mode_w = KORE_GPU_ADDRESS_MODE_REPEAT,
+        .mag_filter     = KORE_GPU_FILTER_MODE_LINEAR,
+        .min_filter     = KORE_GPU_FILTER_MODE_LINEAR,
+        .mipmap_filter  = KORE_GPU_MIPMAP_FILTER_MODE_NEAREST,
+        .lod_min_clamp  = 1,
+        .lod_max_clamp  = 32,
+        .compare        = KORE_GPU_COMPARE_FUNCTION_UNDEFINED,
+        .max_anisotropy = 1,
+    };
+    kore_gpu_device_create_sampler(&device, &sampler_params, &sampler);
 
-    textures_parameters textures_params = {
+    kong_create_buffer_vertex_in(&device, 3, &vertices);
+    vertex_in *v = kong_vertex_in_buffer_lock(&vertices);
+
+    v[0].pos.x = -1.0f;
+    v[0].pos.y = -1.0f;
+    v[0].pos.z = 0.5f;
+
+    v[0].tex.x = 0.0f;
+    v[0].tex.y = 1.0f;
+
+    v[1].pos.x = 1.0f;
+    v[1].pos.y = -1.0f;
+    v[1].pos.z = 0.5f;
+
+    v[1].tex.x = 1.0f;
+    v[1].tex.y = 1.0f;
+
+    v[2].pos.x = -1.0f;
+    v[2].pos.y = 1.0f;
+    v[2].pos.z = 0.5f;
+
+    v[2].tex.x = 0.0f;
+    v[2].tex.y = 0.0f;
+
+    kong_vertex_in_buffer_unlock(&vertices);
+
+    kore_gpu_buffer_parameters index_params = {
+        .size        = 3 * sizeof(uint16_t),
+        .usage_flags = KORE_GPU_BUFFER_USAGE_INDEX | KORE_GPU_BUFFER_USAGE_CPU_WRITE,
+    };
+    kore_gpu_device_create_buffer(&device, &index_params, &indices);
+    {
+        uint16_t *i = (uint16_t *)kore_gpu_buffer_lock_all(&indices);
+
+        i[0] = 0;
+        i[1] = 1;
+        i[2] = 2;
+
+        kore_gpu_buffer_unlock(&indices);
+    }
+
+    constants_type_buffer_create(&device, &constants, KORE_GPU_MAX_FRAMEBUFFERS);
+
+    everything_parameters everything_params = {
+        .constants = &constants,
         .tex = test_texture_view,
-        .sam = &test_sampler,
+        .sam = &sampler,
     };
-    kong_create_textures_set(&device, &textures_params, &texture_set);
-
-    mvp_parameters mvp_params = {
-        .constants = &uniform_buffer,
-    };
-    kong_create_mvp_set(&device, &mvp_params, &uniform_set);
+    kong_create_everything_set(&device, &everything_params, &texture_set);
 
     kore_start();
+
+    kong_destroy_everything_set(&texture_set);
+    constants_type_buffer_destroy(&constants);
+    kore_gpu_buffer_destroy(&indices);
+    kore_gpu_sampler_destroy(&sampler);
+    kong_destroy_buffer_vertex_in(&vertices);
+    kore_gpu_texture_destroy(&test_texture);
+    kore_gpu_command_list_destroy(&list);
+    kore_gpu_device_destroy(&device);
 
     return 0;
 }

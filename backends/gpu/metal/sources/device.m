@@ -271,6 +271,12 @@ void kore_metal_device_create_texture(kore_gpu_device *device, const kore_gpu_te
 	if ((parameters->usage & KORE_GPU_TEXTURE_USAGE_RENDER_ATTACHMENT) != 0) {
 		descriptor.usage |= MTLTextureUsageRenderTarget;
 	}
+	if ((parameters->usage & KORE_GPU_TEXTURE_USAGE_SAMPLED) != 0) {
+		descriptor.usage |= MTLTextureUsageShaderRead;
+	}
+	if ((parameters->usage & KORE_GPU_TEXTURE_USAGE_COPY_DST) != 0) {
+		descriptor.usage |= MTLTextureUsagePixelFormatView;
+	}
 
 	id<MTLDevice> metal_device = (__bridge id<MTLDevice>)device->metal.device;
 	texture->metal.texture     = (__bridge_retained void *)[metal_device newTextureWithDescriptor:descriptor];

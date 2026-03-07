@@ -42,11 +42,11 @@ static Vertex vertices[24] = {
     { -0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f },
     { -0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 0.0f },
 
-    // Top face (y=+1) - Blue (CCW from outside)
-    { -0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f },
-    {  0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f },
-    {  0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f },
-    { -0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f },
+    // Top face (y=+1) - Bright Orange
+    { -0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.0f },
+    {  0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.0f },
+    {  0.5f,  0.5f, -0.5f,  1.0f, 1.0f, 0.0f },
+    { -0.5f,  0.5f, -0.5f,  1.0f, 1.0f, 0.0f },
 
     // Bottom face (y=-1) - Yellow
     { -0.5f, -0.5f, -0.5f,  1.0f, 1.0f, 0.0f },
@@ -72,8 +72,8 @@ static uint16_t indices[36] = {
     0, 2, 1,  0, 3, 2,
     // Back (CCW from outside)
     4, 6, 5,  4, 7, 6,
-    // Top (CCW from outside)
-    8, 10, 9,  8, 11, 10,
+    // Top (CW from camera)
+    8, 9, 10,  8, 10, 11,
     // Bottom (CCW from outside)
     12, 14, 13,  12, 15, 14,
     // Right (CCW from outside)
@@ -97,7 +97,7 @@ static void update(void *data) {
 	kore_float3    v1         = {0, 0, 0};
 	kore_float3    v2         = {0, 1, 0};
 	kore_matrix4x4 view       = kore_matrix4x4_look_at(v0, v1, v2);
-	kore_matrix4x4 model      = kore_matrix4x4_identity();
+	kore_matrix4x4 model      = kore_matrix4x4_rotation_y(time);
 	kore_matrix4x4 mvp        = kore_matrix4x4_identity();
 	mvp                       = kore_matrix4x4_multiply(&mvp, &projection);
 	mvp                       = kore_matrix4x4_multiply(&mvp, &view);
