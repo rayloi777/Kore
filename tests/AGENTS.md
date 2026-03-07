@@ -12,7 +12,8 @@ tests/
 ├── cube_texture_test/   # 3D cube + texture mapping ✅
 ├── triangle/            # 2D triangle ✅
 ├── texture_test/        # Texture upload + sampling ✅
-├── mipmap_test/         # Mipmap + sample_lod ✅
+├── mipmap_test/         # Mipmap levels, sample_lod ✅
+├── computeshader_test/  # Compute shader + texture output ✅
 ├── audio_test/          # Audio playback + synthesis ✅
 ├── matrix_test/         # SIMD matrix benchmarks ✅
 ├── simd/                # SIMD operations ✅
@@ -35,6 +36,7 @@ tests/
 | triangle | `./make -g metal ... --from tests/triangle` | 2D colored triangle |
 | texture_test | `./make -g metal ... --from tests/texture_test` | Texture upload, RGBA8, Kongruent shader |
 | mipmap_test | `./make -g metal ... --from tests/mipmap_test` | Mipmap levels, sample_lod |
+| computeshader_test | `./make -g metal ... --from tests/computeshader_test` | Compute shader, texture output |
 | audio_test | `./make -g metal ... --from tests/audio_test` | OGG + sine wave |
 | matrix_test | `./make -g metal ... --from tests/matrix_test` | SIMD benchmarks |
 
