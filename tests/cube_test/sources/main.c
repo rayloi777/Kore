@@ -94,13 +94,13 @@ static void update(void *data) {
     float near = 0.1f;
     float far = 100.0f;
     
-    kore_matrix4x4 proj = kore_matrix4x4_perspective(fov, aspect, near, far);
-    kore_matrix4x4 view = kore_matrix4x4_look_at((kore_float3){0, 0, 4}, (kore_float3){0, 0, 0}, (kore_float3){0, 1, 0});
-    kore_matrix4x4 model_y = kore_matrix4x4_rotation_y(time);
-    kore_matrix4x4 model_x = kore_matrix4x4_rotation_x(time * 0.7f);
-    kore_matrix4x4 model = kore_matrix4x4_multiply(&model_x, &model_y);
-    kore_matrix4x4 view_model = kore_matrix4x4_multiply(&model, &view);
-    kore_matrix4x4 mvp = kore_matrix4x4_multiply(&view_model, &proj);
+    kore_matrix4x4 proj = kore_matrix4x4_perspective(fov, aspect, 0.1f, 100.0f);
+    kore_matrix4x4 view = kore_matrix4x4_translation(0, 0, -4);
+    kore_matrix4x4 rot = kore_matrix4x4_rotation_y(time);
+    kore_matrix4x4 scale = kore_matrix4x4_scale(0.3f, 0.3f, 0.3f);
+    kore_matrix4x4 mvp = kore_matrix4x4_multiply(&view, &rot);
+    mvp = kore_matrix4x4_multiply(&mvp, &scale);
+    mvp = kore_matrix4x4_multiply(&proj, &mvp);
     
     constants_type uniforms = {0};
     for (int i = 0; i < 16; i++) {

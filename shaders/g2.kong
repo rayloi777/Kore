@@ -1,4 +1,5 @@
-const kore_g2_constants: {
+#[set(projection)]
+const constants: {
 	projection: float4x4;
 };
 
@@ -15,7 +16,7 @@ struct kore_g2_colored_vertex_out {
 fun kore_g2_colored_vertex(input: kore_g2_colored_vertex_in): kore_g2_colored_vertex_out {
 	var output: kore_g2_colored_vertex_out;
 
-	output.pos = kore_g2_constants.projection * float4(input.pos, 1.0);
+	output.pos = constants.projection * float4(input.pos, 1.0);
 	output.pos.z = 0.5;
 	output.pos.w = 1.0;
 	output.col = input.col;
@@ -52,7 +53,7 @@ struct kore_g2_image_vertex_out {
 fun kore_g2_image_vertex(input: kore_g2_image_vertex_in): kore_g2_image_vertex_out {
 	var output: kore_g2_image_vertex_out;
 
-	output.pos = kore_g2_constants.projection * float4(input.pos, 1.0);
+	output.pos = constants.projection * float4(input.pos, 1.0);
 	output.pos.z = 0.5;
 	output.pos.w = 1.0;
 	output.tex = input.tex;
@@ -61,11 +62,14 @@ fun kore_g2_image_vertex(input: kore_g2_image_vertex_in): kore_g2_image_vertex_o
 	return output;
 }
 
-const kore_g2_texture: tex2d;
-const kore_g2_sampler: sampler;
+#[set(textures)]
+const tex: tex2d;
+
+#[set(textures)]
+const sam: sampler;
 
 fun kore_g2_image_fragment(input: kore_g2_image_vertex_out): float4 {
-	var texcolor: float4 = sample(kore_g2_texture, kore_g2_sampler, input.tex) * input.col;
+	var texcolor: float4 = sample(tex, sam, input.tex) * input.col;
 	texcolor.rgb *= input.col.a;
 	return texcolor;
 }
