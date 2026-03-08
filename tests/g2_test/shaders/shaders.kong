@@ -1,10 +1,12 @@
 struct vertex_in {
     pos: float2;
+    uv: float2;
     color: float4;
 }
 
 struct vertex_out {
     pos: float4;
+    uv: float2;
     color: float4;
 }
 
@@ -13,23 +15,25 @@ const constants: {
     mvp: float3x3;
 };
 
+fun pos(input: vertex_in): vertex_out {
+    var out: vertex_out;
+    
+    out.pos = float4(constants.mvp * float3(input.pos.x, input.pos.y, 1.0), 1.0);
+    out.uv = input.uv;
+    out.color = input.color;
+
+    return out;
+}
+
 #[set(everything)]
 const tex: tex2d;
 
 #[set(everything)]
 const sam: sampler;
 
-fun pos(input: vertex_in): vertex_out {
-    var out: vertex_out;
-    
-    out.pos = float4(constants.mvp * float3(input.pos.x, input.pos.y, 1.0), 1.0);
-    out.color = input.color;
-
-    return out;
-}
-
 fun pix(input: vertex_out): float4 {
-    return input.color;
+    var tc: float4 = sample(tex, sam, input.uv);
+    return tc * input.color;
 }
 
 #[pipe]

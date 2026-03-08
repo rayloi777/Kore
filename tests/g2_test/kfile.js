@@ -9,7 +9,11 @@ project.setDebugDir('deployment');
 project.addIncludeDir('../../build/Kong-osx-metal');
 project.addFile('../../build/Kong-osx-metal/kong.m');
 
+project.addIncludeDir('../../sources/2d');
+project.addFile('../../sources/2d/g2unit.c');
+
 project.addKongDir('shaders');
 
 project.flatten();
+
 resolve(project);
