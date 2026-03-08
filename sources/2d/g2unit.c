@@ -390,14 +390,75 @@ void kore_g2_set_color_uint(uint32_t color) {
 }
 
 void kore_g2_draw_string(const char *utf8_text, float x, float y) {
-	(void)utf8_text;
-	(void)x;
-	(void)y;
+	if (utf8_text == NULL || g_font == NULL || g_command_list == NULL) {
+		return;
+	}
+	
+	kore_gpu_texture *font_tex = kore_g2_font_get_texture(g_font);
+	if (font_tex == NULL) {
+		return;
+	}
+	
+	float xpos = x;
+	float ypos = y + kore_g2_font_baseline(g_font);
+	
+	const char *p = utf8_text;
+	while (*p) {
+		uint32_t codepoint = utf8_decode(&p);
+		
+		kore_g2_font_aligned_quad quad;
+		if (kore_g2_font_get_baked_quad(g_font, codepoint, &xpos, &ypos, &quad)) {
+			if (g_vertex_count + 4 > MAX_VERTICES) {
+				kore_g2_flush();
+			}
+			
+			if (g_current_texture != font_tex) {
+				if (g_current_texture != NULL) {
+					kore_g2_flush();
+				}
+				g_current_texture = font_tex;
+				kore_gpu_texture_view_create(g_device, font_tex, &g_current_texture_view);
+				
+				everything_parameters params = {
+					.constants = &g_constants,
+					.tex = g_current_texture_view,
+					.sam = &g_sampler,
+				};
+				kong_create_everything_set(g_device, &params, &g_descriptor_set);
+			}
+			
+			vertex_in *verts = kong_vertex_in_buffer_lock(&g_vertices);
+			int base = g_vertex_count;
+			
+			float r = g_color_r * g_opacity;
+			float g_col = g_color_g * g_opacity;
+			float b = g_color_b * g_opacity;
+			float a = g_color_a * g_opacity;
+			
+			g2_vertex temp[4] = {
+				{.x = quad.x0, .y = quad.y0, .u = quad.s0, .v = quad.t0, .r = r, .g = g_col, .b = b, .a = a},
+				{.x = quad.x1, .y = quad.y0, .u = quad.s1, .v = quad.t0, .r = r, .g = g_col, .b = b, .a = a},
+				{.x = quad.x1, .y = quad.y1, .u = quad.s1, .v = quad.t1, .r = r, .g = g_col, .b = b, .a = a},
+				{.x = quad.x0, .y = quad.y1, .u = quad.s0, .v = quad.t1, .r = r, .g = g_col, .b = b, .a = a},
+			};
+			
+			for (int i = 0; i < 4; i++) {
+				g2_to_vertex(&temp[i], &verts[base + i]);
+			}
+			
+			kong_vertex_in_buffer_unlock(&g_vertices);
+			
+			g_vertex_count += 4;
+			g_index_count += 6;
+		}
+	}
 }
 
 float kore_g2_string_width(const char *utf8_text) {
-	(void)utf8_text;
-	return 0.0f;
+	if (utf8_text == NULL || g_font == NULL) {
+		return 0.0f;
+	}
+	return kore_g2_font_string_width(g_font, utf8_text);
 }
 
 void kore_g2_translate(float tx, float ty) {

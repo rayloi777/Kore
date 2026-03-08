@@ -1,4 +1,5 @@
 #include <kore3/g2/g2.h>
+#include <kore3/g2/font.h>
 #include <kore3/gpu/device.h>
 #include <kore3/gpu/texture.h>
 #include <kore3/gpu/buffer.h>
@@ -16,6 +17,8 @@ static kore_gpu_device       device;
 static kore_gpu_command_list list;
 static kore_gpu_texture      white_texture;
 static kore_gpu_texture_view white_texture_view;
+static kore_g2_font           font;
+static bool                   font_loaded = false;
 
 static uint64_t update_index = 0;
 
@@ -45,13 +48,20 @@ static void update(void *data) {
     kore_g2_begin(&list);
     
     kore_g2_set_color(1.0f, 1.0f, 1.0f, 1.0f);
-    kore_g2_draw_scaled_image(&white_texture, 100.0f, 100.0f, 200.0f, 200.0f);
+    kore_g2_draw_scaled_image(&white_texture, 50.0f, 50.0f, 100.0f, 100.0f);
     
     kore_g2_set_color(1.0f, 0.0f, 0.0f, 1.0f);
-    kore_g2_draw_scaled_image(&white_texture, 350.0f, 100.0f, 150.0f, 150.0f);
+    kore_g2_draw_scaled_image(&white_texture, 200.0f, 50.0f, 80.0f, 80.0f);
     
     kore_g2_set_color(0.0f, 1.0f, 0.0f, 1.0f);
-    kore_g2_draw_scaled_image(&white_texture, 100.0f, 350.0f, 100.0f, 100.0f);
+    kore_g2_draw_scaled_image(&white_texture, 50.0f, 200.0f, 60.0f, 60.0f);
+    
+    if (font_loaded) {
+        kore_g2_set_font(&font);
+        kore_g2_set_font_size(32.0f);
+        kore_g2_set_color(1.0f, 1.0f, 1.0f, 1.0f);
+        kore_g2_draw_string("Hello", 300.0f, 100.0f);
+    }
     
     kore_g2_flush();
     kore_g2_end();
@@ -64,7 +74,7 @@ static void update(void *data) {
 }
 
 int kickstart(int argc, char **argv) {
-    kore_init("g2 Test", width, height, NULL, NULL);
+    kore_init("g2 Text Test", width, height, NULL, NULL);
     kore_set_update_callback(update, NULL);
 
     kore_gpu_device_wishlist wishlist = {0};
@@ -112,7 +122,6 @@ int kickstart(int argc, char **argv) {
         .texture   = &white_texture,
         .mip_level = 0,
     };
-
     kore_gpu_command_list_copy_buffer_to_texture(&list, &source, &destination, 1, 1, 1);
     kore_gpu_device_execute_command_list(&device, &list);
     
@@ -120,8 +129,15 @@ int kickstart(int argc, char **argv) {
     
     kore_gpu_texture_view_create(&device, &white_texture, &white_texture_view);
 
+    int glyph_count;
+    const int *glyphs = kore_g2_font_get_default_glyphs(&glyph_count);
+    font_loaded = kore_g2_font_init_with_glyphs(&font, &device, "NotoSansTC-Regular.ttf", 32.0f, glyphs, glyph_count);
+
     kore_start();
 
+    if (font_loaded) {
+        kore_g2_font_destroy(&font);
+    }
     kore_gpu_texture_view_destroy(&white_texture_view);
     kore_gpu_texture_destroy(&white_texture);
     kore_gpu_command_list_destroy(&list);
