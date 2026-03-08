@@ -69,9 +69,16 @@ const tex: tex2d;
 const sam: sampler;
 
 fun kore_g2_image_fragment(input: kore_g2_image_vertex_out): float4 {
-	var texcolor: float4 = sample(tex, sam, input.tex) * input.col;
-	texcolor.rgb *= input.col.a;
-	return texcolor;
+    // Sample texture - for R8 (font) texture, R channel contains alpha
+    // For RGBA textures, all channels are used
+    var sampled: float4 = sample(tex, sam, input.tex);
+    // Use R channel as alpha for font rendering (R8 format)
+    var alpha: float = sampled.r;
+    // Apply color with alpha blending
+    var texcolor: float4 = float4(input.col.rgb, input.col.a * alpha);
+    // Pre-multiply alpha
+    texcolor.rgb *= texcolor.a;
+    return texcolor;
 }
 
 #[pipe]

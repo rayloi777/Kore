@@ -6,6 +6,7 @@
 
 #include <kong.h>
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -408,6 +409,8 @@ void kore_g2_draw_string(const char *utf8_text, float x, float y) {
 		
 		kore_g2_font_aligned_quad quad;
 		if (kore_g2_font_get_baked_quad(g_font, codepoint, &xpos, &ypos, &quad)) {
+			printf("Draw glyph: codepoint=%d (0x%x), quad: x0=%.1f y0=%.1f x1=%.1f y1=%.1f s0=%.3f t0=%.3f s1=%.3f t1=%.3f\n", 
+				codepoint, codepoint, quad.x0, quad.y0, quad.x1, quad.y1, quad.s0, quad.t0, quad.s1, quad.t1);
 			if (g_vertex_count + 4 > MAX_VERTICES) {
 				kore_g2_flush();
 			}
@@ -436,10 +439,10 @@ void kore_g2_draw_string(const char *utf8_text, float x, float y) {
 			float a = g_color_a * g_opacity;
 			
 			g2_vertex temp[4] = {
-				{.x = quad.x0, .y = quad.y0, .u = quad.s0, .v = quad.t0, .r = r, .g = g_col, .b = b, .a = a},
-				{.x = quad.x1, .y = quad.y0, .u = quad.s1, .v = quad.t0, .r = r, .g = g_col, .b = b, .a = a},
-				{.x = quad.x1, .y = quad.y1, .u = quad.s1, .v = quad.t1, .r = r, .g = g_col, .b = b, .a = a},
-				{.x = quad.x0, .y = quad.y1, .u = quad.s0, .v = quad.t1, .r = r, .g = g_col, .b = b, .a = a},
+				{.x = quad.x0, .y = quad.y0, .u = quad.s0, .v = 1.0f - quad.t0, .r = r, .g = g_col, .b = b, .a = a},
+				{.x = quad.x1, .y = quad.y0, .u = quad.s1, .v = 1.0f - quad.t0, .r = r, .g = g_col, .b = b, .a = a},
+				{.x = quad.x1, .y = quad.y1, .u = quad.s1, .v = 1.0f - quad.t1, .r = r, .g = g_col, .b = b, .a = a},
+				{.x = quad.x0, .y = quad.y1, .u = quad.s0, .v = 1.0f - quad.t1, .r = r, .g = g_col, .b = b, .a = a},
 			};
 			
 			for (int i = 0; i < 4; i++) {

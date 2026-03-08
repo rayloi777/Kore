@@ -57,10 +57,15 @@ static void update(void *data) {
     kore_g2_draw_scaled_image(&white_texture, 50.0f, 200.0f, 60.0f, 60.0f);
     
     if (font_loaded) {
+        printf("Drawing text...\n");
         kore_g2_set_font(&font);
-        kore_g2_set_font_size(32.0f);
+        kore_g2_set_font_size(24.0f);
         kore_g2_set_color(1.0f, 1.0f, 1.0f, 1.0f);
-        kore_g2_draw_string("Hello", 300.0f, 100.0f);
+        kore_g2_draw_string("Hello World", 300.0f, 100.0f);
+        kore_g2_draw_string("你好世界", 300.0f, 150.0f);
+        printf("Text draw called\n");
+    } else {
+        printf("Font not loaded, skipping text\n");
     }
     
     kore_g2_flush();
@@ -129,9 +134,14 @@ int kickstart(int argc, char **argv) {
     
     kore_gpu_texture_view_create(&device, &white_texture, &white_texture_view);
 
-    int glyph_count;
-    const int *glyphs = kore_g2_font_get_default_glyphs(&glyph_count);
-    font_loaded = kore_g2_font_init_with_glyphs(&font, &device, "NotoSansTC-Regular.ttf", 32.0f, glyphs, glyph_count);
+    int ascii_glyphs[128];
+    for (int i = 0; i < 128; i++) ascii_glyphs[i] = i;
+    int chinese_glyphs[] = {0x4F60, 0x597D, 0x4E16, 0x754C};
+    int all_glyphs[132];
+    for (int i = 0; i < 128; i++) all_glyphs[i] = ascii_glyphs[i];
+    for (int i = 0; i < 4; i++) all_glyphs[128 + i] = chinese_glyphs[i];
+    font_loaded = kore_g2_font_init_with_glyphs(&font, &device, "NotoSansTC-Regular.ttf", 24.0f, all_glyphs, 132);
+    printf("Font loaded: %d\n", font_loaded);
 
     kore_start();
 

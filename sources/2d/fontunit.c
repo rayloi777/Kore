@@ -122,13 +122,14 @@ static bool bake_font(kore_g2_font *font, kore_gpu_device *device, const int *co
 	font->char_blocks = malloc(blocks_count * 2 * sizeof(int));
 	memcpy(font->char_blocks, temp_blocks, blocks_count * 2 * sizeof(int));
 	font->char_blocks_count = blocks_count * 2;
-	free(temp_blocks);
 	
 	int total_glyphs = 0;
 	for (int i = 0; i < blocks_count; i++) {
-		total_glyphs += temp_blocks[i * 2 + 1] - temp_blocks[i * 2] + 1;
+		total_glyphs += font->char_blocks[i * 2 + 1] - font->char_blocks[i * 2] + 1;
 	}
 	font->total_glyphs = total_glyphs;
+	
+	free(temp_blocks);
 	
 	font->baked_chars = malloc(total_glyphs * sizeof(stbtt_bakedchar));
 	
@@ -136,9 +137,17 @@ static bool bake_font(kore_g2_font *font, kore_gpu_device *device, const int *co
 	int height = KORE_G2_FONT_TEXTURE_SIZE;
 	uint8_t *pixels = malloc(width * height);
 	
+	kore_log(KORE_LOG_LEVEL_INFO, "Baking %d glyphs, font size: %f", total_glyphs, font->font_size);
+	
 	int result = stbtt_BakeFontBitmap(font->font_data, offset, font->font_size, pixels, width, height, sorted_codepoints[0], total_glyphs, font->baked_chars);
 	
-	kore_log(KORE_LOG_LEVEL_INFO, "stbtt_BakeFontBitmap result: %d, total_glyphs: %d", result, total_glyphs);
+	kore_log(KORE_LOG_LEVEL_INFO, "stbtt_BakeFontBitmap result: %d pixels baked, total_glyphs: %d", result, total_glyphs);
+	
+	stbtt_bakedchar *chars = (stbtt_bakedchar *)font->baked_chars;
+	kore_log(KORE_LOG_LEVEL_INFO, "First glyph (space): x0=%d y0=%d x1=%d y1=%d", 
+		chars[0].x0, chars[0].y0, chars[0].x1, chars[0].y1);
+	kore_log(KORE_LOG_LEVEL_INFO, "Glyph 128 (0x4F60='你'): x0=%d y0=%d x1=%d y1=%d", 
+		chars[128].x0, chars[128].y0, chars[128].x1, chars[128].y1);
 	
 	if (result <= 0) {
 		free(pixels);
@@ -178,16 +187,24 @@ bool kore_g2_font_init(kore_g2_font *font, kore_gpu_device *device, const char *
 bool kore_g2_font_init_with_glyphs(kore_g2_font *font, kore_gpu_device *device, const char *filename, float font_size,
                                    const int *codepoints, int codepoints_count) {
 	kore_file_reader file;
+	kore_log(KORE_LOG_LEVEL_INFO, "Attempting to load font: %s", filename);
 	if (!kore_file_reader_open(&file, filename, KORE_FILE_TYPE_ASSET)) {
+		kore_log(KORE_LOG_LEVEL_ERROR, "Failed to open font file: %s", filename);
 		return false;
 	}
 	
 	int size = kore_file_reader_size(&file);
+	kore_log(KORE_LOG_LEVEL_INFO, "Font file opened, size: %d", size);
+	
 	uint8_t *data = malloc(size);
 	kore_file_reader_read(&file, data, size);
 	kore_file_reader_close(&file);
 	
 	bool result = kore_g2_font_init_from_memory(font, device, data, size, font_size, codepoints, codepoints_count);
+	
+	if (!result) {
+		kore_log(KORE_LOG_LEVEL_ERROR, "Font init from memory failed");
+	}
 	
 	return result;
 }
