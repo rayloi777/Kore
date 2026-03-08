@@ -1,0 +1,40 @@
+struct vertex_in {
+    pos: float2;
+    color: float4;
+}
+
+struct vertex_out {
+    pos: float4;
+    color: float4;
+}
+
+#[set(everything), indexed]
+const constants: {
+    mvp: float3x3;
+};
+
+#[set(everything)]
+const tex: tex2d;
+
+#[set(everything)]
+const sam: sampler;
+
+fun pos(input: vertex_in): vertex_out {
+    var out: vertex_out;
+    
+    out.pos = float4(constants.mvp * float3(input.pos.x, input.pos.y, 1.0), 1.0);
+    out.color = input.color;
+
+    return out;
+}
+
+fun pix(input: vertex_out): float4 {
+    return input.color;
+}
+
+#[pipe]
+struct pipeline {
+    vertex = pos;
+    fragment = pix;
+    format = framebuffer_format();
+}

@@ -14,14 +14,17 @@
 #include <stdint.h>
 #include <string.h>
 
-static const int width  = 800;
-static const int height = 600;
+#define TEX_SIZE 256
+#define MIP_LEVELS 4
+#define FACE_COUNT 6
+
+static const int width  = 1920;
+static const int height = 1080;
 
 static kore_gpu_device       device;
 static kore_gpu_command_list list;
 static vertex_in_buffer      vertices;
 static kore_gpu_buffer       indices;
-static kore_gpu_buffer       image_buffer;
 static kore_gpu_texture      test_texture;
 static kore_gpu_texture_view test_texture_view;
 static kore_gpu_sampler      sampler;
@@ -31,8 +34,34 @@ static kore_gpu_texture      depth_texture;
 
 static bool     first_update = true;
 static uint64_t update_index = 0;
+static kore_gpu_buffer       mip_buffers[MIP_LEVELS * FACE_COUNT];
 
-#define TEX_SIZE 256
+static void generate_mip_face(uint32_t *pixels, int size, int face_index, int mip_level) {
+    int checker_size = size / 8;
+    uint32_t colors[6] = {0xFFFF0000, 0xFF00FF00, 0xFF0000FF, 0xFFFFFF00, 0xFFFF00FF, 0xFF00FFFF};
+    uint32_t color = colors[face_index];
+    
+    // Darker for higher mip levels
+    float brightness = 1.0f - (float)mip_level * 0.15f;
+    uint8_t r = (uint8_t)((color >> 16) & 0xFF) * brightness;
+    uint8_t g = (uint8_t)((color >> 8) & 0xFF) * brightness;
+    uint8_t b = (uint8_t)(color & 0xFF) * brightness;
+    uint32_t adjusted_color = 0xFF000000 | (r << 16) | (g << 8) | b;
+    
+    for (int y = 0; y < size; y++) {
+        for (int x = 0; x < size; x++) {
+            int cx = x / checker_size;
+            int cy = y / checker_size;
+            int idx = y * size + x;
+            
+            if ((cx + cy) % 2 == 0) {
+                pixels[idx] = adjusted_color;
+            } else {
+                pixels[idx] = 0xFF000000;
+            }
+        }
+    }
+}
 
 static void update(void *data) {
     float time_val = (float)kore_time();
@@ -72,18 +101,29 @@ static void update(void *data) {
     constants_type_buffer_unlock(&constants);
 
     if (first_update) {
-        kore_gpu_image_copy_buffer source = {
-            .buffer         = &image_buffer,
-            .bytes_per_row  = kore_gpu_device_align_texture_row_bytes(&device, TEX_SIZE * 4),
-            .rows_per_image = TEX_SIZE,
-        };
+        int mip_width = TEX_SIZE;
+        int mip_height = TEX_SIZE;
+        
+        for (int mip = 0; mip < MIP_LEVELS; mip++) {
+            for (int face = 0; face < FACE_COUNT; face++) {
+                kore_gpu_image_copy_buffer source = {
+                    .buffer         = &mip_buffers[mip * FACE_COUNT + face],
+                    .bytes_per_row  = kore_gpu_device_align_texture_row_bytes(&device, mip_width * 4),
+                    .rows_per_image = mip_height,
+                };
 
-        kore_gpu_image_copy_texture destination = {
-            .texture   = &test_texture,
-            .mip_level = 0,
-        };
+                kore_gpu_image_copy_texture destination = {
+                    .texture   = &test_texture,
+                    .mip_level = mip,
+                    .origin_z  = face,
+                };
 
-        kore_gpu_command_list_copy_buffer_to_texture(&list, &source, &destination, TEX_SIZE, TEX_SIZE, 1);
+                kore_gpu_command_list_copy_buffer_to_texture(&list, &source, &destination, mip_width, mip_height, 1);
+            }
+            
+            mip_width /= 2;
+            mip_height /= 2;
+        }
     }
 
     kore_gpu_render_pass_parameters parameters = {
@@ -135,28 +175,13 @@ static void update(void *data) {
     kore_gpu_device_execute_command_list(&device, &list);
 
     if (first_update) {
-        kore_gpu_buffer_destroy(&image_buffer);
+        for (int i = 0; i < MIP_LEVELS * FACE_COUNT; i++) {
+            kore_gpu_buffer_destroy(&mip_buffers[i]);
+        }
         first_update = false;
     }
 
     update_index += 1;
-}
-
-static void generate_checkerboard(uint32_t *pixels, int size) {
-    int checker_size = size / 8;
-    for (int y = 0; y < size; y++) {
-        for (int x = 0; x < size; x++) {
-            int cx = x / checker_size;
-            int cy = y / checker_size;
-            int idx = y * size + x;
-            
-            if ((cx + cy) % 2 == 0) {
-                pixels[idx] = 0xFFFFFFFF;
-            } else {
-                pixels[idx] = 0xFF000000;
-            }
-        }
-    }
 }
 
 int kickstart(int argc, char **argv) {
@@ -170,23 +195,33 @@ int kickstart(int argc, char **argv) {
 
     kore_gpu_device_create_command_list(&device, KORE_GPU_COMMAND_LIST_TYPE_GRAPHICS, &list);
 
-    uint32_t buffer_size = kore_gpu_device_align_texture_row_bytes(&device, TEX_SIZE * 4) * TEX_SIZE;
+    int mip_width = TEX_SIZE;
+    int mip_height = TEX_SIZE;
     
-    kore_gpu_buffer_parameters buffer_params = {
-        .size        = buffer_size,
-        .usage_flags = KORE_GPU_BUFFER_USAGE_CPU_WRITE | KORE_GPU_BUFFER_USAGE_COPY_SRC,
-    };
-    kore_gpu_device_create_buffer(&device, &buffer_params, &image_buffer);
+    for (int mip = 0; mip < MIP_LEVELS; mip++) {
+        for (int face = 0; face < FACE_COUNT; face++) {
+            uint32_t buffer_size = kore_gpu_device_align_texture_row_bytes(&device, mip_width * 4) * mip_height;
+            
+            kore_gpu_buffer_parameters buffer_params = {
+                .size        = buffer_size,
+                .usage_flags = KORE_GPU_BUFFER_USAGE_CPU_WRITE | KORE_GPU_BUFFER_USAGE_COPY_SRC,
+            };
+            kore_gpu_device_create_buffer(&device, &buffer_params, &mip_buffers[mip * FACE_COUNT + face]);
 
-    uint32_t *ptr = (uint32_t *)kore_gpu_buffer_lock_all(&image_buffer);
-    generate_checkerboard(ptr, TEX_SIZE);
-    kore_gpu_buffer_unlock(&image_buffer);
+            uint32_t *ptr = (uint32_t *)kore_gpu_buffer_lock_all(&mip_buffers[mip * FACE_COUNT + face]);
+            generate_mip_face(ptr, mip_width, face, mip);
+            kore_gpu_buffer_unlock(&mip_buffers[mip * FACE_COUNT + face]);
+        }
+        
+        mip_width /= 2;
+        mip_height /= 2;
+    }
 
     kore_gpu_texture_parameters tex_params = {
         .width                 = TEX_SIZE,
         .height                = TEX_SIZE,
-        .depth_or_array_layers = 1,
-        .mip_level_count       = 1,
+        .depth_or_array_layers = FACE_COUNT,
+        .mip_level_count       = MIP_LEVELS,
         .sample_count          = 1,
         .dimension             = KORE_GPU_TEXTURE_DIMENSION_2D,
         .format                = KORE_GPU_TEXTURE_FORMAT_RGBA8_UNORM,
@@ -194,6 +229,14 @@ int kickstart(int argc, char **argv) {
     };
     kore_gpu_device_create_texture(&device, &tex_params, &test_texture);
 
+    test_texture_view.texture = &test_texture;
+    test_texture_view.format = KORE_GPU_TEXTURE_FORMAT_RGBA8_UNORM;
+    test_texture_view.dimension = KORE_GPU_TEXTURE_VIEW_DIMENSION_CUBE;
+    test_texture_view.aspect = KORE_GPU_IMAGE_COPY_ASPECT_ALL;
+    test_texture_view.base_mip_level = 0;
+    test_texture_view.mip_level_count = MIP_LEVELS;
+    test_texture_view.base_array_layer = 0;
+    test_texture_view.array_layer_count = FACE_COUNT;
     kore_gpu_texture_view_create(&device, &test_texture, &test_texture_view);
 
     kore_gpu_sampler_parameters sampler_params = {
@@ -202,9 +245,9 @@ int kickstart(int argc, char **argv) {
         .address_mode_w = KORE_GPU_ADDRESS_MODE_REPEAT,
         .mag_filter     = KORE_GPU_FILTER_MODE_LINEAR,
         .min_filter     = KORE_GPU_FILTER_MODE_LINEAR,
-        .mipmap_filter  = KORE_GPU_MIPMAP_FILTER_MODE_NEAREST,
-        .lod_min_clamp  = 1,
-        .lod_max_clamp  = 32,
+        .mipmap_filter  = KORE_GPU_MIPMAP_FILTER_MODE_LINEAR,
+        .lod_min_clamp  = 0,
+        .lod_max_clamp  = MIP_LEVELS - 1,
         .compare        = KORE_GPU_COMPARE_FUNCTION_UNDEFINED,
         .max_anisotropy = 1,
     };

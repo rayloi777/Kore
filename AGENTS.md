@@ -24,7 +24,7 @@ Cross-platform C game engine with multi-GPU support (Metal, Vulkan, OpenGL, Dire
 | Math | `includes/kore3/math/` (SIMD in `sources/math/`) |
 | Audio | `includes/kore3/mixer/` or `audio/` |
 | Backend impl | `backends/gpu/metal/`, `backends/system/macos/` |
-| Tests | `tests/cube_test/`, `tests/texture_test/`, `tests/audio_test/`, `tests/mipmap_test/`, `tests/computeshader_test/` |
+| Tests | `tests/cube_test/`, `tests/texture_test/`, `tests/audio_test/`, `tests/mipmap_test/`, `tests/computeshader_test/`, `tests/g2_test/` |
 
 ## BUILD
 ```bash
@@ -58,3 +58,6 @@ open build/build/Release/computeshader_test.app
 - Use `translation()` + `perspective()` instead of `look_at()` for camera (look_at has issues)
 - Metal texture sampling requires `KORE_GPU_TEXTURE_USAGE_SAMPLED` flag in texture creation
 - Image loading: stbi converts all formats to RGBA when comp=4, RGB images need alpha set to opaque
+- g2 2D rendering: orthographic projection matrix for screen coords → NDC
+  - kore_matrix3x3 is column-major: m[x*3+y] = column x, row y
+  - 2D ortho matrix (screen 0,width × 0,height → NDC -1,1): m[0]=2/width, m[4]=2/height, m[2]=-1, m[5]=-1
