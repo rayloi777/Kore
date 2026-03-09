@@ -198,6 +198,9 @@ typedef struct kore_metal_render_pipeline_parameters {
 typedef struct kore_metal_render_pipeline {
 	void *pipeline;
 	void *depth_stencil_state;
+	uint32_t primitive_type;
+	uint32_t cull_mode;
+	uint32_t front_face_winding;
 } kore_metal_render_pipeline;
 
 typedef struct kore_metal_compute_pipeline_parameters {
@@ -217,7 +220,12 @@ typedef struct kore_metal_ray_pipeline_parameters {
 } kore_metal_ray_pipeline_parameters;
 
 typedef struct kore_metal_ray_pipeline {
-	int nothing;
+	void *ray_gen_pipeline;
+	void *miss_pipeline;
+	void *closest_hit_pipeline;
+	void *intersection_pipeline;
+	void *any_hit_pipeline;
+	void *shader_binding_table;
 } kore_metal_ray_pipeline;
 
 #ifdef __cplusplus

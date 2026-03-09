@@ -142,6 +142,60 @@ static MTLCompareFunction convert_compare(kore_gpu_compare_function func) {
 	}
 }
 
+static MTLPrimitiveType convert_primitive_topology(kore_metal_primitive_topology topology) {
+	switch (topology) {
+	case KORE_METAL_PRIMITIVE_TOPOLOGY_POINT_LIST:
+		return MTLPrimitiveTypePoint;
+	case KORE_METAL_PRIMITIVE_TOPOLOGY_LINE_LIST:
+		return MTLPrimitiveTypeLine;
+	case KORE_METAL_PRIMITIVE_TOPOLOGY_LINE_STRIP:
+		return MTLPrimitiveTypeLineStrip;
+	case KORE_METAL_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
+		return MTLPrimitiveTypeTriangle;
+	case KORE_METAL_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP:
+		return MTLPrimitiveTypeTriangleStrip;
+	}
+	return MTLPrimitiveTypeTriangle;
+}
+
+static MTLWinding convert_front_face(kore_metal_front_face face) {
+	return face == KORE_METAL_FRONT_FACE_CCW ? MTLWindingCounterClockwise : MTLWindingClockwise;
+}
+
+static MTLCullMode convert_cull_mode(kore_metal_cull_mode mode) {
+	switch (mode) {
+	case KORE_METAL_CULL_MODE_NONE:
+		return MTLCullModeNone;
+	case KORE_METAL_CULL_MODE_FRONT:
+		return MTLCullModeFront;
+	case KORE_METAL_CULL_MODE_BACK:
+		return MTLCullModeBack;
+	}
+	return MTLCullModeNone;
+}
+
+static MTLStencilOperation convert_stencil_op(kore_metal_stencil_operation op) {
+	switch (op) {
+	case KORE_METAL_STENCIL_OPERATION_KEEP:
+		return MTLStencilOperationKeep;
+	case KORE_METAL_STENCIL_OPERATION_ZERO:
+		return MTLStencilOperationZero;
+	case KORE_METAL_STENCIL_OPERATION_REPLACE:
+		return MTLStencilOperationReplace;
+	case KORE_METAL_STENCIL_OPERATION_INVERT:
+		return MTLStencilOperationInvert;
+	case KORE_METAL_STENCIL_OPERATION_INCREMENT_CLAMP:
+		return MTLStencilOperationIncrementClamp;
+	case KORE_METAL_STENCIL_OPERATION_DECREMENT_CLAMP:
+		return MTLStencilOperationDecrementClamp;
+	case KORE_METAL_STENCIL_OPERATION_INCREMENT_WRAP:
+		return MTLStencilOperationIncrementWrap;
+	case KORE_METAL_STENCIL_OPERATION_DECREMENT_WRAP:
+		return MTLStencilOperationDecrementWrap;
+	}
+	return MTLStencilOperationKeep;
+}
+
 void kore_metal_render_pipeline_init(kore_metal_device *device, kore_metal_render_pipeline *pipe, const kore_metal_render_pipeline_parameters *parameters) {
 	id<MTLLibrary> library = (__bridge id<MTLLibrary>)device->library;
 
@@ -325,11 +379,44 @@ void kore_metal_render_pipeline_init(kore_metal_device *device, kore_metal_rende
 		depth_stencil_descriptor.depthCompareFunction = convert_compare(parameters->depth_stencil.depth_compare);
 		depth_stencil_descriptor.depthWriteEnabled    = parameters->depth_stencil.depth_write_enabled;
 
+		if (has_stencil(parameters->depth_stencil.format)) {
+			MTLStencilDescriptor *front_stencil = [[MTLStencilDescriptor alloc] init];
+			front_stencil.stencilCompareFunction = convert_compare(parameters->depth_stencil.stencil_front.compare);
+			front_stencil.stencilFailureOperation = convert_stencil_op(parameters->depth_stencil.stencil_front.fail_op);
+			front_stencil.depthFailureOperation = convert_stencil_op(parameters->depth_stencil.stencil_front.depth_fail_op);
+			front_stencil.depthStencilPassOperation = convert_stencil_op(parameters->depth_stencil.stencil_front.pass_op);
+			front_stencil.readMask = parameters->depth_stencil.stencil_read_mask;
+			front_stencil.writeMask = parameters->depth_stencil.stencil_write_mask;
+			depth_stencil_descriptor.frontFaceStencil = front_stencil;
+
+			MTLStencilDescriptor *back_stencil = [[MTLStencilDescriptor alloc] init];
+			back_stencil.stencilCompareFunction = convert_compare(parameters->depth_stencil.stencil_back.compare);
+			back_stencil.stencilFailureOperation = convert_stencil_op(parameters->depth_stencil.stencil_back.fail_op);
+			back_stencil.depthFailureOperation = convert_stencil_op(parameters->depth_stencil.stencil_back.depth_fail_op);
+			back_stencil.depthStencilPassOperation = convert_stencil_op(parameters->depth_stencil.stencil_back.pass_op);
+			back_stencil.readMask = parameters->depth_stencil.stencil_read_mask;
+			back_stencil.writeMask = parameters->depth_stencil.stencil_write_mask;
+			depth_stencil_descriptor.backFaceStencil = back_stencil;
+		}
+
 		pipe->depth_stencil_state = (__bridge_retained void *)[metal_device newDepthStencilStateWithDescriptor:depth_stencil_descriptor];
 	}
+
+	pipe->primitive_type = convert_primitive_topology(parameters->primitive.topology);
+	pipe->cull_mode = convert_cull_mode(parameters->primitive.cull_mode);
+	pipe->front_face_winding = convert_front_face(parameters->primitive.front_face);
 }
 
-void kore_metal_render_pipeline_destroy(kore_metal_render_pipeline *pipe) {}
+void kore_metal_render_pipeline_destroy(kore_metal_render_pipeline *pipe) {
+	if (pipe->pipeline != NULL) {
+		CFRelease(pipe->pipeline);
+		pipe->pipeline = NULL;
+	}
+	if (pipe->depth_stencil_state != NULL) {
+		CFRelease(pipe->depth_stencil_state);
+		pipe->depth_stencil_state = NULL;
+	}
+}
 
 void kore_metal_compute_pipeline_init(kore_metal_device *device, kore_metal_compute_pipeline *pipe, const kore_metal_compute_pipeline_parameters *parameters) {
 	id<MTLLibrary> library = (__bridge id<MTLLibrary>)device->library;
@@ -342,8 +429,69 @@ void kore_metal_compute_pipeline_init(kore_metal_device *device, kore_metal_comp
 	pipe->pipeline = (__bridge_retained void *)[metal_device newComputePipelineStateWithFunction:compute_function error:&errors];
 }
 
-void kore_metal_compute_pipeline_destroy(kore_metal_compute_pipeline *pipe) {}
+void kore_metal_compute_pipeline_destroy(kore_metal_compute_pipeline *pipe) {
+	if (pipe->pipeline != NULL) {
+		CFRelease(pipe->pipeline);
+		pipe->pipeline = NULL;
+	}
+}
 
-void kore_metal_ray_pipeline_init(kore_gpu_device *device, kore_metal_ray_pipeline *pipe, const kore_metal_ray_pipeline_parameters *parameters) {}
+void kore_metal_ray_pipeline_init(kore_gpu_device *device, kore_metal_ray_pipeline *pipe, const kore_metal_ray_pipeline_parameters *parameters) {
+	if (@available(macOS 11.0, iOS 14.0, *)) {
+		id<MTLDevice> metal_device = (__bridge id<MTLDevice>)device->metal.device;
+		id<MTLLibrary> library = (__bridge id<MTLLibrary>)device->metal.library;
+		
+		if (parameters->gen_shader.function_name != NULL) {
+			id<MTLFunction> ray_gen_func = [library newFunctionWithName:[NSString stringWithCString:parameters->gen_shader.function_name encoding:NSUTF8StringEncoding]];
+			if (ray_gen_func != nil) {
+				NSError *error = nil;
+				pipe->ray_gen_pipeline = (__bridge_retained void *)[metal_device newComputePipelineStateWithFunction:ray_gen_func error:&error];
+			}
+		}
+		
+		if (parameters->miss_shader.function_name != NULL) {
+			id<MTLFunction> miss_func = [library newFunctionWithName:[NSString stringWithCString:parameters->miss_shader.function_name encoding:NSUTF8StringEncoding]];
+			if (miss_func != nil) {
+				NSError *error = nil;
+				pipe->miss_pipeline = (__bridge_retained void *)[metal_device newComputePipelineStateWithFunction:miss_func error:&error];
+			}
+		}
+		
+		if (parameters->closest_shader.function_name != NULL) {
+			id<MTLFunction> closest_hit_func = [library newFunctionWithName:[NSString stringWithCString:parameters->closest_shader.function_name encoding:NSUTF8StringEncoding]];
+			if (closest_hit_func != nil) {
+				NSError *error = nil;
+				pipe->closest_hit_pipeline = (__bridge_retained void *)[metal_device newComputePipelineStateWithFunction:closest_hit_func error:&error];
+			}
+		}
+		
+		pipe->shader_binding_table = NULL;
+	}
+}
 
-void kore_metal_ray_pipeline_destroy(kore_metal_ray_pipeline *pipe) {}
+void kore_metal_ray_pipeline_destroy(kore_metal_ray_pipeline *pipe) {
+	if (pipe->ray_gen_pipeline != NULL) {
+		CFRelease(pipe->ray_gen_pipeline);
+		pipe->ray_gen_pipeline = NULL;
+	}
+	if (pipe->miss_pipeline != NULL) {
+		CFRelease(pipe->miss_pipeline);
+		pipe->miss_pipeline = NULL;
+	}
+	if (pipe->closest_hit_pipeline != NULL) {
+		CFRelease(pipe->closest_hit_pipeline);
+		pipe->closest_hit_pipeline = NULL;
+	}
+	if (pipe->intersection_pipeline != NULL) {
+		CFRelease(pipe->intersection_pipeline);
+		pipe->intersection_pipeline = NULL;
+	}
+	if (pipe->any_hit_pipeline != NULL) {
+		CFRelease(pipe->any_hit_pipeline);
+		pipe->any_hit_pipeline = NULL;
+	}
+	if (pipe->shader_binding_table != NULL) {
+		CFRelease(pipe->shader_binding_table);
+		pipe->shader_binding_table = NULL;
+	}
+}

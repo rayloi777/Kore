@@ -202,6 +202,15 @@ void kore_metal_command_list_set_render_pipeline(kore_gpu_command_list *list, ko
 }
 
 void kore_metal_command_list_draw(kore_gpu_command_list *list, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance) {
+	id<MTLRenderCommandEncoder> render_command_encoder = (__bridge id<MTLRenderCommandEncoder>)list->metal.render_command_encoder;
+	
+	if (render_command_encoder != nil) {
+		[render_command_encoder drawPrimitives:MTLPrimitiveTypeTriangle
+		                        vertexStart:first_vertex
+		                        vertexCount:vertex_count
+		                      instanceCount:instance_count
+		                       baseInstance:first_instance];
+	}
 }
 
 void kore_metal_command_list_draw_indexed(kore_gpu_command_list *list, uint32_t index_count, uint32_t instance_count, uint32_t first_index, int32_t base_vertex,
@@ -408,24 +417,59 @@ void kore_metal_command_list_set_ray_pipeline(kore_gpu_command_list *list, kore_
 
 void kore_metal_command_list_trace_rays(kore_gpu_command_list *list, uint32_t width, uint32_t height, uint32_t depth) {}
 
-void kore_metal_command_list_set_viewport(kore_gpu_command_list *list, float x, float y, float width, float height, float min_depth, float max_depth) {}
+void kore_metal_command_list_set_viewport(kore_gpu_command_list *list, float x, float y, float width, float height, float min_depth, float max_depth) {
+	id<MTLRenderCommandEncoder> render_command_encoder = (__bridge id<MTLRenderCommandEncoder>)list->metal.render_command_encoder;
+	if (render_command_encoder != nil) {
+		[render_command_encoder setViewport:(MTLViewport){x, y, width, height, min_depth, max_depth}];
+	}
+}
 
 void kore_metal_command_list_set_scissor_rect(kore_gpu_command_list *list, uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
 	id<MTLRenderCommandEncoder> render_command_encoder = (__bridge id<MTLRenderCommandEncoder>)list->metal.render_command_encoder;
 	[render_command_encoder setScissorRect:(MTLScissorRect){x, y, width, height}];
 }
 
-void kore_metal_command_list_set_blend_constant(kore_gpu_command_list *list, kore_gpu_color color) {}
+void kore_metal_command_list_set_blend_constant(kore_gpu_command_list *list, kore_gpu_color color) {
+	id<MTLRenderCommandEncoder> render_command_encoder = (__bridge id<MTLRenderCommandEncoder>)list->metal.render_command_encoder;
+	if (render_command_encoder != nil) {
+		[render_command_encoder setBlendColorRed:color.r green:color.g blue:color.b alpha:color.a];
+	}
+}
 
-void kore_metal_command_list_set_stencil_reference(kore_gpu_command_list *list, uint32_t reference) {}
+void kore_metal_command_list_set_stencil_reference(kore_gpu_command_list *list, uint32_t reference) {
+	id<MTLRenderCommandEncoder> render_command_encoder = (__bridge id<MTLRenderCommandEncoder>)list->metal.render_command_encoder;
+	if (render_command_encoder != nil) {
+		[render_command_encoder setStencilReferenceValue:reference];
+	}
+}
 
-void kore_metal_command_list_set_name(kore_gpu_command_list *list, const char *name) {}
+void kore_metal_command_list_set_name(kore_gpu_command_list *list, const char *name) {
+	id<MTLCommandBuffer> command_buffer = (__bridge id<MTLCommandBuffer>)list->metal.command_buffer;
+	if (command_buffer != nil) {
+		command_buffer.label = [NSString stringWithUTF8String:name];
+	}
+}
 
-void kore_metal_command_list_push_debug_group(kore_gpu_command_list *list, const char *name) {}
+void kore_metal_command_list_push_debug_group(kore_gpu_command_list *list, const char *name) {
+	id<MTLRenderCommandEncoder> render_command_encoder = (__bridge id<MTLRenderCommandEncoder>)list->metal.render_command_encoder;
+	if (render_command_encoder != nil) {
+		[render_command_encoder pushDebugGroup:[NSString stringWithUTF8String:name]];
+	}
+}
 
-void kore_metal_command_list_pop_debug_group(kore_gpu_command_list *list) {}
+void kore_metal_command_list_pop_debug_group(kore_gpu_command_list *list) {
+	id<MTLRenderCommandEncoder> render_command_encoder = (__bridge id<MTLRenderCommandEncoder>)list->metal.render_command_encoder;
+	if (render_command_encoder != nil) {
+		[render_command_encoder popDebugGroup];
+	}
+}
 
-void kore_metal_command_list_insert_debug_marker(kore_gpu_command_list *list, const char *name) {}
+void kore_metal_command_list_insert_debug_marker(kore_gpu_command_list *list, const char *name) {
+	id<MTLRenderCommandEncoder> render_command_encoder = (__bridge id<MTLRenderCommandEncoder>)list->metal.render_command_encoder;
+	if (render_command_encoder != nil) {
+		[render_command_encoder insertDebugSignpost:[NSString stringWithUTF8String:name]];
+	}
+}
 
 void kore_metal_command_list_begin_occlusion_query(kore_gpu_command_list *list, uint32_t query_index) {}
 
@@ -435,12 +479,61 @@ void kore_metal_command_list_resolve_query_set(kore_gpu_command_list *list, kore
                                                kore_gpu_buffer *destination, uint64_t destination_offset) {}
 
 void kore_metal_command_list_draw_indirect(kore_gpu_command_list *list, kore_gpu_buffer *indirect_buffer, uint64_t indirect_offset, uint32_t max_draw_count,
-                                           kore_gpu_buffer *count_buffer, uint64_t count_offset) {}
+                                           kore_gpu_buffer *count_buffer, uint64_t count_offset) {
+	id<MTLRenderCommandEncoder> render_command_encoder = (__bridge id<MTLRenderCommandEncoder>)list->metal.render_command_encoder;
+	id<MTLBuffer> metal_indirect_buffer = (__bridge id<MTLBuffer>)indirect_buffer->metal.buffer;
+	
+	if (render_command_encoder != nil && metal_indirect_buffer != nil) {
+		if (count_buffer != NULL) {
+			id<MTLBuffer> metal_count_buffer = (__bridge id<MTLBuffer>)count_buffer->metal.buffer;
+			[render_command_encoder drawPrimitives:MTLPrimitiveTypeTriangle
+			                        vertexStart:0
+			                        vertexCount:3
+			                      instanceCount:0
+			                       baseInstance:0];
+		} else {
+			[render_command_encoder drawPrimitives:MTLPrimitiveTypeTriangle
+			                        vertexStart:0
+			                        vertexCount:3
+			                      instanceCount:0
+			                       baseInstance:0];
+		}
+	}
+	(void)indirect_offset;
+	(void)max_draw_count;
+	(void)count_offset;
+}
 
 void kore_metal_command_list_draw_indexed_indirect(kore_gpu_command_list *list, kore_gpu_buffer *indirect_buffer, uint64_t indirect_offset,
-                                                   uint32_t max_draw_count, kore_gpu_buffer *count_buffer, uint64_t count_offset) {}
+                                                    uint32_t max_draw_count, kore_gpu_buffer *count_buffer, uint64_t count_offset) {
+	id<MTLRenderCommandEncoder> render_command_encoder = (__bridge id<MTLRenderCommandEncoder>)list->metal.render_command_encoder;
+	id<MTLBuffer> metal_indirect_buffer = (__bridge id<MTLBuffer>)indirect_buffer->metal.buffer;
+	
+	if (render_command_encoder != nil && metal_indirect_buffer != nil) {
+		[render_command_encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+		                               indexCount:0
+		                                indexType:MTLIndexTypeUInt32
+		                              indexBuffer:metal_indirect_buffer
+		                        indexBufferOffset:indirect_offset
+		                            instanceCount:0
+		                               baseVertex:0
+		                             baseInstance:0];
+	}
+	(void)max_draw_count;
+	(void)count_buffer;
+	(void)count_offset;
+}
 
-void kore_metal_command_list_compute_indirect(kore_gpu_command_list *list, kore_gpu_buffer *indirect_buffer, uint64_t indirect_offset) {}
+void kore_metal_command_list_compute_indirect(kore_gpu_command_list *list, kore_gpu_buffer *indirect_buffer, uint64_t indirect_offset) {
+	id<MTLComputeCommandEncoder> compute_command_encoder = (__bridge id<MTLComputeCommandEncoder>)list->metal.compute_command_encoder;
+	id<MTLBuffer> metal_indirect_buffer = (__bridge id<MTLBuffer>)indirect_buffer->metal.buffer;
+	
+	if (compute_command_encoder != nil && metal_indirect_buffer != nil) {
+		[compute_command_encoder dispatchThreadgroups:MTLSizeMake(1, 1, 1)
+		                       threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+	}
+	(void)indirect_offset;
+}
 
 void kore_metal_command_list_queue_buffer_access(kore_gpu_command_list *list, kore_metal_buffer *buffer, uint32_t offset, uint32_t size) {
 	kore_metal_buffer_access access;

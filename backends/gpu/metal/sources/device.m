@@ -430,8 +430,22 @@ uint32_t kore_metal_device_align_texture_row_bytes(kore_gpu_device *device, uint
 	return row_bytes;
 }
 
-void kore_metal_device_create_fence(kore_gpu_device *device, kore_gpu_fence *fence) {}
+void kore_metal_device_create_fence(kore_gpu_device *device, kore_gpu_fence *fence) {
+	(void)device;
+	fence->metal.event = NULL;
+	fence->metal.current_value = 0;
+}
 
-void kore_metal_device_signal(kore_gpu_device *device, kore_gpu_command_list_type list_type, kore_gpu_fence *fence, uint64_t value) {}
+void kore_metal_device_signal(kore_gpu_device *device, kore_gpu_command_list_type list_type, kore_gpu_fence *fence, uint64_t value) {
+	(void)device;
+	(void)list_type;
+	(void)fence;
+	(void)value;
+}
 
-void kore_metal_device_wait(kore_gpu_device *device, kore_gpu_command_list_type list_type, kore_gpu_fence *fence, uint64_t value) {}
+void kore_metal_device_wait(kore_gpu_device *device, kore_gpu_command_list_type list_type, kore_gpu_fence *fence, uint64_t value) {
+	(void)device;
+	(void)list_type;
+	(void)fence;
+	(void)value;
+}

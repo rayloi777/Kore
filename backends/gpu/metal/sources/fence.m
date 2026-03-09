@@ -2,4 +2,9 @@
 
 #include <kore3/gpu/fence.h>
 
-void kore_metal_fence_destroy(kore_gpu_fence *fence) {}
+void kore_metal_fence_destroy(kore_gpu_fence *fence) {
+	if (fence->metal.event != NULL) {
+		CFRelease(fence->metal.event);
+		fence->metal.event = NULL;
+	}
+}

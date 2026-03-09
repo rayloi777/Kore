@@ -35,7 +35,10 @@ static uint64_t find_max_execution_index(kore_gpu_buffer *buffer, uint64_t offse
 	return max_execution_index;
 }
 
-void kore_metal_buffer_set_name(kore_gpu_buffer *buffer, const char *name) {}
+void kore_metal_buffer_set_name(kore_gpu_buffer *buffer, const char *name) {
+	id<MTLBuffer> metal_buffer = (__bridge id<MTLBuffer>)buffer->metal.buffer;
+	metal_buffer.label = [NSString stringWithUTF8String:name];
+}
 
 void kore_metal_buffer_destroy(kore_gpu_buffer *buffer) {
 	CFRelease(buffer->metal.buffer);
@@ -82,7 +85,15 @@ void *kore_metal_buffer_lock(kore_gpu_buffer *buffer, uint64_t offset, uint64_t 
 	return buffer->metal.locked_data;
 }
 
-void kore_metal_buffer_unlock(kore_gpu_buffer *buffer) {}
+void kore_metal_buffer_unlock(kore_gpu_buffer *buffer) {
+#ifndef KORE_APPLE_SOC
+	if (buffer->metal.host_visible) {
+		id<MTLBuffer> metal_buffer = (__bridge id<MTLBuffer>)buffer->metal.buffer;
+		[metal_buffer didModifyRange:NSMakeRange(0, buffer->metal.size)];
+	}
+#endif
+	buffer->metal.locked_data = NULL;
+}
 
 void kore_metal_buffer_unlock_all(kore_gpu_buffer *buffer) {
 	buffer->metal.locked_data = NULL;

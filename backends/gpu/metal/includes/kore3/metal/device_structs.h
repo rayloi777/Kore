@@ -28,7 +28,9 @@ typedef struct kore_metal_device {
 } kore_metal_device;
 
 typedef struct kore_metal_query_set {
-	int nothing;
+	void *query_buffer;
+	int type;
+	uint32_t count;
 } kore_metal_query_set;
 
 #ifdef __cplusplus
