@@ -35,6 +35,7 @@ typedef struct kore_metal_command_list {
 	bool  sixteen_bit_indices;
 
 	struct kore_metal_render_pipeline *current_render_pipeline;
+	struct kore_metal_ray_pipeline *ray_pipeline;
 
 	kore_metal_buffer_access queued_buffer_accesses[KORE_METAL_COMMAND_LIST_MAX_QUEUED_BUFFER_ACCESSES];
 	uint32_t                 queued_buffer_accesses_count;

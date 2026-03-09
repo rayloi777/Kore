@@ -255,6 +255,22 @@ KORE_FUNC void kore_gpu_compute_pipeline_init(kore_gpu_device *device, kore_gpu_
 
 KORE_FUNC void kore_gpu_compute_pipeline_destroy(kore_gpu_compute_pipeline *pipeline);
 
+typedef struct kore_gpu_ray_pipeline_parameters {
+	kore_gpu_shader gen_shader;
+	kore_gpu_shader miss_shader;
+	kore_gpu_shader closest_shader;
+	kore_gpu_shader intersection_shader;
+	kore_gpu_shader any_shader;
+} kore_gpu_ray_pipeline_parameters;
+
+typedef struct kore_gpu_ray_pipeline {
+	KORE_GPU_IMPL(ray_pipeline);
+} kore_gpu_ray_pipeline;
+
+KORE_FUNC void kore_gpu_ray_pipeline_init(kore_gpu_device *device, kore_gpu_ray_pipeline *pipeline, const kore_gpu_ray_pipeline_parameters *parameters);
+
+KORE_FUNC void kore_gpu_ray_pipeline_destroy(kore_gpu_ray_pipeline *pipeline);
+
 #ifdef __cplusplus
 }
 #endif

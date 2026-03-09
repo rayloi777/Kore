@@ -418,11 +418,80 @@ void kore_metal_device_create_sampler(kore_gpu_device *device, const kore_gpu_sa
 	sampler->metal.sampler     = (__bridge_retained void *)[metal_device newSamplerStateWithDescriptor:desc];
 }
 
-void kore_metal_device_create_raytracing_volume(kore_gpu_device *device, kore_gpu_buffer *vertex_buffer, uint64_t vertex_count, kore_gpu_buffer *index_buffer,
-                                                uint32_t index_count, kore_gpu_raytracing_volume *volume) {}
+void kore_metal_device_create_raytracing_volume(kore_gpu_device *device, kore_gpu_buffer *vertex_buffer, uint64_t vertex_count, kore_gpu_buffer *index_buffer, uint32_t index_count, kore_gpu_raytracing_volume *volume) {
+	if (@available(macOS 11.0, iOS 14.0, *)) {
+		id<MTLDevice> metal_device = (__bridge id<MTLDevice>)device->metal.device;
+		
+		MTLAccelerationStructureTriangleGeometryDescriptor *geom = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
+		geom.vertexBuffer = (__bridge id<MTLBuffer>)vertex_buffer->metal.buffer;
+		geom.vertexBufferOffset = 0;
+		geom.vertexStride = sizeof(float) * 3;
+		geom.triangleCount = index_count / 3;
+		geom.indexBuffer = (__bridge id<MTLBuffer>)index_buffer->metal.buffer;
+		geom.indexBufferOffset = 0;
+		geom.indexType = MTLIndexTypeUInt32;
+		
+		MTLPrimitiveAccelerationStructureDescriptor *prim_desc = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
+		prim_desc.geometryDescriptors = @[geom];
+		prim_desc.usage = MTLAccelerationStructureUsageRefit;
+		
+		MTLAccelerationStructureSizes sizes = [metal_device accelerationStructureSizesWithDescriptor:prim_desc];
+		
+		volume->metal.acceleration_structure = (__bridge_retained void *)[metal_device newAccelerationStructureWithSize:sizes.accelerationStructureSize];
+		volume->metal.scratch_buffer = (__bridge_retained void *)[metal_device newBufferWithLength:sizes.buildScratchBufferSize options:MTLResourceStorageModePrivate];
+		volume->metal.compacted_size_buffer = (__bridge_retained void *)[metal_device newBufferWithLength:sizeof(uint64_t) options:MTLResourceStorageModeShared];
+		volume->metal.vertex_buffer = vertex_buffer->metal.buffer;
+		volume->metal.index_buffer = index_buffer->metal.buffer;
+		volume->metal.vertex_count = vertex_count;
+		volume->metal.index_count = index_count;
+		volume->metal.allows_update = true;
+		volume->metal.is_compacted = false;
+	}
+}
 
-void kore_metal_device_create_raytracing_hierarchy(kore_gpu_device *device, kore_gpu_raytracing_volume **volumes, kore_matrix4x4 *volume_transforms,
-                                                   uint32_t volumes_count, kore_gpu_raytracing_hierarchy *hierarchy) {}
+void kore_metal_device_create_raytracing_hierarchy(kore_gpu_device *device, kore_gpu_raytracing_volume **volumes, kore_matrix4x4 *volume_transforms, uint32_t volumes_count, kore_gpu_raytracing_hierarchy *hierarchy) {
+	if (@available(macOS 11.0, iOS 14.0, *)) {
+		id<MTLDevice> metal_device = (__bridge id<MTLDevice>)device->metal.device;
+		
+		size_t instance_buffer_size = volumes_count * sizeof(MTLAccelerationStructureUserIDInstanceDescriptor);
+		hierarchy->metal.instance_buffer = (__bridge_retained void *)[metal_device newBufferWithLength:instance_buffer_size options:MTLResourceStorageModeShared];
+		
+		id<MTLBuffer> instance_buf = (__bridge id<MTLBuffer>)hierarchy->metal.instance_buffer;
+		MTLAccelerationStructureUserIDInstanceDescriptor *instances = (MTLAccelerationStructureUserIDInstanceDescriptor *)instance_buf.contents;
+		
+		NSMutableArray *blas_array = [NSMutableArray array];
+		for (uint32_t i = 0; i < volumes_count; i++) {
+			instances[i].transformationMatrix.columns[0][0] = volume_transforms[i].m[0];
+			instances[i].transformationMatrix.columns[0][1] = volume_transforms[i].m[4];
+			instances[i].transformationMatrix.columns[0][2] = volume_transforms[i].m[8];
+			instances[i].transformationMatrix.columns[1][0] = volume_transforms[i].m[1];
+			instances[i].transformationMatrix.columns[1][1] = volume_transforms[i].m[5];
+			instances[i].transformationMatrix.columns[1][2] = volume_transforms[i].m[9];
+			instances[i].transformationMatrix.columns[2][0] = volume_transforms[i].m[2];
+			instances[i].transformationMatrix.columns[2][1] = volume_transforms[i].m[6];
+			instances[i].transformationMatrix.columns[2][2] = volume_transforms[i].m[10];
+			
+			[blas_array addObject:(__bridge id<MTLAccelerationStructure>)volumes[i]->metal.acceleration_structure];
+		}
+		
+		MTLInstanceAccelerationStructureDescriptor *inst_desc = [MTLInstanceAccelerationStructureDescriptor descriptor];
+		inst_desc.instanceDescriptorBuffer = (__bridge id<MTLBuffer>)hierarchy->metal.instance_buffer;
+		inst_desc.instanceDescriptorBufferOffset = 0;
+		inst_desc.instanceDescriptorStride = sizeof(MTLAccelerationStructureUserIDInstanceDescriptor);
+		inst_desc.instanceCount = volumes_count;
+		inst_desc.instancedAccelerationStructures = blas_array;
+		inst_desc.allowsUpdate = YES;
+		
+		MTLAccelerationStructureSizes sizes = [metal_device accelerationStructureSizesWithDescriptor:inst_desc];
+		
+		hierarchy->metal.acceleration_structure = (__bridge_retained void *)[metal_device newAccelerationStructureWithSize:sizes.accelerationStructureSize];
+		hierarchy->metal.scratch_buffer = (__bridge_retained void *)[metal_device newBufferWithLength:sizes.buildScratchBufferSize options:MTLResourceStorageModePrivate];
+		hierarchy->metal.compacted_size_buffer = (__bridge_retained void *)[metal_device newBufferWithLength:sizeof(uint64_t) options:MTLResourceStorageModeShared];
+		hierarchy->metal.instance_count = volumes_count;
+		hierarchy->metal.allows_update = true;
+		hierarchy->metal.is_compacted = false;
+	}
+}
 
 void kore_metal_device_create_query_set(kore_gpu_device *device, const kore_gpu_query_set_parameters *parameters, kore_gpu_query_set *query_set) {}
 

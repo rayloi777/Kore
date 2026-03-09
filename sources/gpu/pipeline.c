@@ -35,3 +35,11 @@ void kore_gpu_compute_pipeline_init(kore_gpu_device *device, kore_gpu_compute_pi
 void kore_gpu_compute_pipeline_destroy(kore_gpu_compute_pipeline *pipeline) {
 	KORE_GPU_CALL1(compute_pipeline_destroy, pipeline);
 }
+
+void kore_gpu_ray_pipeline_init(kore_gpu_device *device, kore_gpu_ray_pipeline *pipeline, const kore_gpu_ray_pipeline_parameters *parameters) {
+	KORE_GPU_CALL3(ray_pipeline_init, device, pipeline, parameters);
+}
+
+void kore_gpu_ray_pipeline_destroy(kore_gpu_ray_pipeline *pipeline) {
+	KORE_GPU_CALL1(ray_pipeline_destroy, pipeline);
+}
