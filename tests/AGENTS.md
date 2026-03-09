@@ -32,13 +32,19 @@ tests/
 | Test | Command | Description |
 |------|---------|-------------|
 | cube_test | `./make -g metal ... --from tests/cube_test` | 3D rotation, MVP, depth |
-| cube_texture_test | `./make -g metal ... --from tests/cube_texture_test` | 3D cube with texture |
+| cube_texture_test | `./make -g metal ... --from tests/cube_texture_test` | 3D cube with texture ✅ iOS fixed |
 | triangle | `./make -g metal ... --from tests/triangle` | 2D colored triangle |
 | texture_test | `./make -g metal ... --from tests/texture_test` | Texture upload, RGBA8, Kongruent shader |
 | mipmap_test | `./make -g metal ... --from tests/mipmap_test` | Mipmap levels, sample_lod |
-| computeshader_test | `./make -g metal ... --from tests/computeshader_test` | Compute shader, texture output |
+| computeshader_test | `./make -g metal ... --from tests/computeshader_test` | Compute shader, texture output ✅ iOS works |
 | audio_test | `./make -g metal ... --from tests/audio_test` | OGG + sine wave |
 | matrix_test | `./make -g metal ... --from tests/matrix_test` | SIMD benchmarks |
+
+## iOS COMPATIBILITY
+Tests with depth textures need resize callback pattern (see `cube_texture_test` for example):
+- ✅ `cube_texture_test` - Fixed with resize callback
+- ✅ `computeshader_test` - No depth texture, works out of box
+- ⚠️ `cube_test`, `triangle`, `text_test`, `image_compress` - Need same fix
 
 ## TEST PATTERN
 Each test has:

@@ -61,3 +61,21 @@ open build/build/Release/computeshader_test.app
 - g2 2D rendering: orthographic projection matrix for screen coords → NDC
   - kore_matrix3x3 is column-major: m[x*3+y] = column x, row y
   - 2D ortho matrix (screen 0,width × 0,height → NDC -1,1): m[0]=2/width, m[4]=2/height, m[2]=-1, m[5]=-1
+
+## iOS DEVELOPMENT
+- **Build:** `./make -t ios -g metal --kore . --from <test> --compile --nosigning`
+- **Simulator:** Requires separate xcodebuild for simulator target
+- **IMPORTANT:** iOS ignores `width`/`height` passed to `kore_init()` - actual size comes from `kore_window_width(0)`/`kore_window_height(0)` which are set by `layoutSubviews`
+- **Depth textures:** MUST use resize callback pattern - do NOT create with hardcoded dimensions in `kickstart()`
+  ```c
+  static void resize(int w, int h, void *data) {
+      // Create/recreate depth texture with actual window size
+      kore_gpu_texture_parameters depth_params = {
+          .width = w, .height = h, ...
+      };
+      kore_gpu_device_create_texture(&device, &depth_params, &depth_texture);
+  }
+  // In kickstart():
+  kore_window_set_resize_callback(0, resize, NULL);
+  ```
+- **Affected tests:** cube_texture_test, cube_test, triangle, text_test, image_compress all need this fix

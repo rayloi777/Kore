@@ -5,6 +5,7 @@
 #include <kore3/io/filereader.h>
 #include <kore3/math/matrix.h>
 #include <kore3/system.h>
+#include <kore3/window.h>
 
 #include <kong.h>
 
@@ -12,6 +13,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 
 #define TEX_SIZE 256
@@ -31,12 +33,35 @@ static kore_gpu_sampler      sampler;
 static kore_gpu_buffer       constants;
 static everything_set        texture_set;
 static kore_gpu_texture      depth_texture;
+static bool                  depth_texture_created = false;
 
 static bool     first_update = true;
 static uint64_t update_index = 0;
 static kore_gpu_buffer       mip_buffers[MIP_LEVELS * FACE_COUNT];
 static double last_time = 0.0;
 static float total_time = 0.0f;
+
+static void create_depth_texture(int w, int h) {
+    if (depth_texture_created) {
+        kore_gpu_texture_destroy(&depth_texture);
+    }
+    kore_gpu_texture_parameters depth_params = {
+        .width = w,
+        .height = h,
+        .depth_or_array_layers = 1,
+        .mip_level_count = 1,
+        .sample_count = 1,
+        .dimension = KORE_GPU_TEXTURE_DIMENSION_2D,
+        .format = KORE_GPU_TEXTURE_FORMAT_DEPTH32_FLOAT,
+        .usage = KORE_GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
+    };
+    kore_gpu_device_create_texture(&device, &depth_params, &depth_texture);
+    depth_texture_created = true;
+}
+
+static void resize(int w, int h, void *data) {
+    create_depth_texture(w, h);
+}
 
 static void generate_mip_face(uint32_t *pixels, int size, int face_index, int mip_level) {
     int checker_size = size / 8;
@@ -344,18 +369,6 @@ int kickstart(int argc, char **argv) {
         kore_gpu_buffer_unlock(&indices);
     }
 
-    kore_gpu_texture_parameters depth_params = {
-        .width = width,
-        .height = height,
-        .depth_or_array_layers = 1,
-        .mip_level_count = 1,
-        .sample_count = 1,
-        .dimension = KORE_GPU_TEXTURE_DIMENSION_2D,
-        .format = KORE_GPU_TEXTURE_FORMAT_DEPTH32_FLOAT,
-        .usage = KORE_GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
-    };
-    kore_gpu_device_create_texture(&device, &depth_params, &depth_texture);
-
     constants_type_buffer_create(&device, &constants, KORE_GPU_MAX_FRAMEBUFFERS);
 
     everything_parameters everything_params = {
@@ -365,9 +378,13 @@ int kickstart(int argc, char **argv) {
     };
     kong_create_everything_set(&device, &everything_params, &texture_set);
 
+    kore_window_set_resize_callback(0, resize, NULL);
+
     kore_start();
 
-    kore_gpu_texture_destroy(&depth_texture);
+    if (depth_texture_created) {
+        kore_gpu_texture_destroy(&depth_texture);
+    }
     kong_destroy_everything_set(&texture_set);
     constants_type_buffer_destroy(&constants);
     kore_gpu_buffer_destroy(&indices);
