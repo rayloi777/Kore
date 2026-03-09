@@ -1,5 +1,7 @@
 #include <kore3/metal/device_functions.h>
 
+#import <simd/simd.h>
+
 #include "metalunit.h"
 
 #include <kore3/gpu/device.h>
@@ -426,10 +428,12 @@ void kore_metal_device_create_raytracing_volume(kore_gpu_device *device, kore_gp
 		geom.vertexBuffer = (__bridge id<MTLBuffer>)vertex_buffer->metal.buffer;
 		geom.vertexBufferOffset = 0;
 		geom.vertexStride = sizeof(float) * 3;
-		geom.triangleCount = index_count / 3;
-		geom.indexBuffer = (__bridge id<MTLBuffer>)index_buffer->metal.buffer;
-		geom.indexBufferOffset = 0;
-		geom.indexType = MTLIndexTypeUInt32;
+		geom.triangleCount = index_count > 0 ? index_count / 3 : vertex_count / 3;
+		if (index_buffer != NULL) {
+			geom.indexBuffer = (__bridge id<MTLBuffer>)index_buffer->metal.buffer;
+			geom.indexBufferOffset = 0;
+			geom.indexType = MTLIndexTypeUInt32;
+		}
 		
 		MTLPrimitiveAccelerationStructureDescriptor *prim_desc = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
 		prim_desc.geometryDescriptors = @[geom];
@@ -441,7 +445,7 @@ void kore_metal_device_create_raytracing_volume(kore_gpu_device *device, kore_gp
 		volume->metal.scratch_buffer = (__bridge_retained void *)[metal_device newBufferWithLength:sizes.buildScratchBufferSize options:MTLResourceStorageModePrivate];
 		volume->metal.compacted_size_buffer = (__bridge_retained void *)[metal_device newBufferWithLength:sizeof(uint64_t) options:MTLResourceStorageModeShared];
 		volume->metal.vertex_buffer = vertex_buffer->metal.buffer;
-		volume->metal.index_buffer = index_buffer->metal.buffer;
+		volume->metal.index_buffer = index_buffer != NULL ? index_buffer->metal.buffer : NULL;
 		volume->metal.vertex_count = vertex_count;
 		volume->metal.index_count = index_count;
 		volume->metal.allows_update = true;
@@ -450,7 +454,7 @@ void kore_metal_device_create_raytracing_volume(kore_gpu_device *device, kore_gp
 }
 
 void kore_metal_device_create_raytracing_hierarchy(kore_gpu_device *device, kore_gpu_raytracing_volume **volumes, kore_matrix4x4 *volume_transforms, uint32_t volumes_count, kore_gpu_raytracing_hierarchy *hierarchy) {
-	if (@available(macOS 11.0, iOS 14.0, *)) {
+	if (@available(macOS 12.0, iOS 15.0, *)) {
 		id<MTLDevice> metal_device = (__bridge id<MTLDevice>)device->metal.device;
 		
 		size_t instance_buffer_size = volumes_count * sizeof(MTLAccelerationStructureUserIDInstanceDescriptor);
@@ -461,15 +465,11 @@ void kore_metal_device_create_raytracing_hierarchy(kore_gpu_device *device, kore
 		
 		NSMutableArray *blas_array = [NSMutableArray array];
 		for (uint32_t i = 0; i < volumes_count; i++) {
-			instances[i].transformationMatrix.columns[0][0] = volume_transforms[i].m[0];
-			instances[i].transformationMatrix.columns[0][1] = volume_transforms[i].m[4];
-			instances[i].transformationMatrix.columns[0][2] = volume_transforms[i].m[8];
-			instances[i].transformationMatrix.columns[1][0] = volume_transforms[i].m[1];
-			instances[i].transformationMatrix.columns[1][1] = volume_transforms[i].m[5];
-			instances[i].transformationMatrix.columns[1][2] = volume_transforms[i].m[9];
-			instances[i].transformationMatrix.columns[2][0] = volume_transforms[i].m[2];
-			instances[i].transformationMatrix.columns[2][1] = volume_transforms[i].m[6];
-			instances[i].transformationMatrix.columns[2][2] = volume_transforms[i].m[10];
+			MTLPackedFloat4x3 mat;
+			mat.columns[0] = (MTLPackedFloat3){ volume_transforms[i].m[0], volume_transforms[i].m[1], volume_transforms[i].m[2] };
+			mat.columns[1] = (MTLPackedFloat3){ volume_transforms[i].m[4], volume_transforms[i].m[5], volume_transforms[i].m[6] };
+			mat.columns[2] = (MTLPackedFloat3){ volume_transforms[i].m[8], volume_transforms[i].m[9], volume_transforms[i].m[10] };
+			instances[i].transformationMatrix = mat;
 			
 			[blas_array addObject:(__bridge id<MTLAccelerationStructure>)volumes[i]->metal.acceleration_structure];
 		}
@@ -480,7 +480,6 @@ void kore_metal_device_create_raytracing_hierarchy(kore_gpu_device *device, kore
 		inst_desc.instanceDescriptorStride = sizeof(MTLAccelerationStructureUserIDInstanceDescriptor);
 		inst_desc.instanceCount = volumes_count;
 		inst_desc.instancedAccelerationStructures = blas_array;
-		inst_desc.allowsUpdate = YES;
 		
 		MTLAccelerationStructureSizes sizes = [metal_device accelerationStructureSizesWithDescriptor:inst_desc];
 		

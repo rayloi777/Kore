@@ -1,5 +1,7 @@
 #include <kore3/metal/commandlist_functions.h>
 
+#import <simd/simd.h>
+
 #include "metalunit.h"
 
 #include <kore3/gpu/commandlist.h>
@@ -416,54 +418,26 @@ void kore_metal_command_list_prepare_raytracing_volume(kore_gpu_command_list *li
 }
 
 void kore_metal_command_list_prepare_raytracing_hierarchy(kore_gpu_command_list *list, kore_gpu_raytracing_hierarchy *hierarchy) {
-}
+	if (@available(macOS 12.0, iOS 15.0, *)) {
+		id<MTLCommandBuffer> command_buffer = (__bridge id<MTLCommandBuffer>)list->metal.command_buffer;
+		if (command_buffer == nil) return;
 
-void kore_metal_command_list_update_raytracing_hierarchy(kore_gpu_command_list *list, kore_matrix4x4 *volume_transforms, uint32_t volumes_count, kore_gpu_raytracing_hierarchy *hierarchy) {
-}
-
-void kore_metal_command_list_set_ray_pipeline(kore_gpu_command_list *list, kore_metal_ray_pipeline *pipeline) {
-	if (@available(macOS 11.0, iOS 14.0, *)) {
-		list->metal.ray_pipeline = pipeline;
-	}
-}
-
-void kore_metal_command_list_trace_rays(kore_gpu_command_list *list, uint32_t width, uint32_t height, uint32_t depth) {
-	if (@available(macOS 11.0, iOS 14.0, *)) {
-		id<MTLComputeCommandEncoder> compute_command_encoder = (__bridge id<MTLComputeCommandEncoder>)list->metal.compute_command_encoder;
-		if (compute_command_encoder == nil) return;
-		
-		kore_metal_ray_pipeline *pipeline = list->metal.ray_pipeline;
-		if (pipeline == NULL) return;
-		
-		id<MTLComputePipelineState> ray_gen_pipeline = (__bridge id<MTLComputePipelineState>)pipeline->ray_gen_pipeline;
-		if (ray_gen_pipeline == nil) return;
-		
-		[compute_command_encoder setComputePipelineState:ray_gen_pipeline];
-		[compute_command_encoder dispatchThreadgroups:MTLSizeMake((width + 7) / 8, (height + 7) / 8, depth)
-		                               threadsPerThreadgroup:MTLSizeMake(8, 8, 1)];
-	}
-}
-}
-
-void kore_metal_command_list_prepare_raytracing_hierarchy(kore_gpu_command_list *list, kore_gpu_raytracing_hierarchy *hierarchy) {
-	if (@available(macOS 11.0, iOS 14.0, *)) {
-		id<MTLComputeCommandEncoder> compute_command_encoder = (__bridge id<MTLComputeCommandEncoder>)list->metal.compute_command_encoder;
-		if (compute_command_encoder == nil) return;
-		
 		id<MTLBuffer> instance_buf = (__bridge id<MTLBuffer>)hierarchy->metal.instance_buffer;
 		id<MTLAccelerationStructure> as = (__bridge id<MTLAccelerationStructure>)hierarchy->metal.acceleration_structure;
 		id<MTLBuffer> scratch = (__bridge id<MTLBuffer>)hierarchy->metal.scratch_buffer;
-		
+
 		MTLInstanceAccelerationStructureDescriptor *inst_desc = [MTLInstanceAccelerationStructureDescriptor descriptor];
 		inst_desc.instanceDescriptorBuffer = instance_buf;
 		inst_desc.instanceDescriptorBufferOffset = 0;
 		inst_desc.instanceDescriptorStride = sizeof(MTLAccelerationStructureUserIDInstanceDescriptor);
 		inst_desc.instanceCount = hierarchy->metal.instance_count;
-		
-		[compute_command_encoder buildAccelerationStructure:as
-		                            descriptor:inst_desc
-		                            scratchBuffer:scratch
-		                            scratchBufferOffset:0];
+
+		id<MTLAccelerationStructureCommandEncoder> accel_command_encoder = [command_buffer accelerationStructureCommandEncoder];
+		[accel_command_encoder buildAccelerationStructure:as
+		                                       descriptor:inst_desc
+		                                       scratchBuffer:scratch
+		                               scratchBufferOffset:0];
+		[accel_command_encoder endEncoding];
 	}
 }
 
@@ -471,17 +445,13 @@ void kore_metal_command_list_update_raytracing_hierarchy(kore_gpu_command_list *
 	if (@available(macOS 12.0, iOS 15.0, *)) {
 		id<MTLBuffer> buffer = (__bridge id<MTLBuffer>)hierarchy->metal.instance_buffer;
 		MTLAccelerationStructureUserIDInstanceDescriptor *instances = (MTLAccelerationStructureUserIDInstanceDescriptor *)buffer.contents;
-		
+
 		for (uint32_t i = 0; i < volumes_count; i++) {
-			instances[i].transformationMatrix.columns[0][0] = volume_transforms[i].m[0];
-			instances[i].transformationMatrix.columns[0][1] = volume_transforms[i].m[4];
-			instances[i].transformationMatrix.columns[0][2] = volume_transforms[i].m[8];
-			instances[i].transformationMatrix.columns[1][0] = volume_transforms[i].m[1];
-			instances[i].transformationMatrix.columns[1][1] = volume_transforms[i].m[5];
-			instances[i].transformationMatrix.columns[1][2] = volume_transforms[i].m[9];
-			instances[i].transformationMatrix.columns[2][0] = volume_transforms[i].m[2];
-			instances[i].transformationMatrix.columns[2][1] = volume_transforms[i].m[6];
-			instances[i].transformationMatrix.columns[2][2] = volume_transforms[i].m[10];
+			MTLPackedFloat4x3 mat = instances[i].transformationMatrix;
+			mat.columns[0] = (MTLPackedFloat3){ volume_transforms[i].m[0], volume_transforms[i].m[1], volume_transforms[i].m[2] };
+			mat.columns[1] = (MTLPackedFloat3){ volume_transforms[i].m[4], volume_transforms[i].m[5], volume_transforms[i].m[6] };
+			mat.columns[2] = (MTLPackedFloat3){ volume_transforms[i].m[8], volume_transforms[i].m[9], volume_transforms[i].m[10] };
+			instances[i].transformationMatrix = mat;
 		}
 	}
 }

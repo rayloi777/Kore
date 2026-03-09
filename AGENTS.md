@@ -1,6 +1,6 @@
 # AGENTS.md - Kore3 Game Engine
 
-**Generated:** 2026-03-07 | **Branch:** main
+**Generated:** 2026-03-10 | **Branch:** main
 
 ## OVERVIEW
 Cross-platform C game engine with multi-GPU support (Metal, Vulkan, OpenGL, Direct3D). Uses Kongruent shader language.
@@ -24,7 +24,7 @@ Cross-platform C game engine with multi-GPU support (Metal, Vulkan, OpenGL, Dire
 | Math | `includes/kore3/math/` (SIMD in `sources/math/`) |
 | Audio | `includes/kore3/mixer/` or `audio/` |
 | Backend impl | `backends/gpu/metal/`, `backends/system/macos/` |
-| Tests | `tests/cube_test/`, `tests/texture_test/`, `tests/audio_test/`, `tests/mipmap_test/`, `tests/computeshader_test/`, `tests/g2_test/` |
+| Tests | `tests/cube_test/`, `tests/texture_test/`, `tests/audio_test/`, `tests/mipmap_test/`, `tests/computeshader_test/`, `tests/g2_test/`, `tests/raytracing_cornellbox/` |
 
 ## BUILD
 ```bash
@@ -79,3 +79,15 @@ open build/build/Release/computeshader_test.app
   kore_window_set_resize_callback(0, resize, NULL);
   ```
 - **Affected tests:** cube_texture_test, cube_test, triangle, text_test, image_compress all need this fix
+
+## RAYTRACING (METAL)
+- **Test:** `tests/raytracing_cornellbox/` - Cornell Box scene with rotating cube, mirror, and floor
+- **Build:** `./make -g metal --kore . --from tests/raytracing_cornellbox --compile`
+- **Metal backend fixes:**
+  - `backends/gpu/metal/sources/device.m` - Fixed NULL pointer dereference when index_buffer is NULL (unindexed geometry)
+- **Kongruent fixes in `Kongruent/sources/backends/metal.c`:**
+  - Added ray pipeline support (`#[raypipe]` - raygen, raymiss, rayclosesthit, rayintersection, rayanyhit)
+  - Added rayset type detection for shader parameters
+  - Fixed `var_name()` to handle globals with sets_count == 0
+  - Fixed function signature generation for ray shaders (no descriptor buffer params)
+- **Current limitation:** Metal Raytracing builtins (`ray_index`, `ray`, `trace_ray`, `world_ray_direction`, `primitive_index`, `object_to_world3x3`, `ray_length`) are not yet available in Xcode Metal compiler. Wait for Apple to release Metal Raytracing support.
