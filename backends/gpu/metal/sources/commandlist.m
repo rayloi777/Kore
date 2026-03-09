@@ -14,11 +14,17 @@
 #include <assert.h>
 
 void kore_metal_command_list_destroy(kore_gpu_command_list *list) {
-	CFRelease(list->metal.command_queue);
-	list->metal.command_queue = NULL;
-
+	id<MTLCommandBuffer> command_buffer = (__bridge id<MTLCommandBuffer>)list->metal.command_buffer;
+	if (command_buffer != nil) {
+		MTLCommandBufferStatus status = command_buffer.status;
+		if (status == MTLCommandBufferStatusCommitted || status == MTLCommandBufferStatusScheduled) {
+			[command_buffer waitUntilCompleted];
+		}
+	}
+	
 	CFRelease(list->metal.command_buffer);
 	list->metal.command_buffer = NULL;
+	list->metal.command_queue = NULL;
 }
 
 static void kore_metal_command_list_begin_blit_pass(kore_gpu_command_list *list);
@@ -223,7 +229,7 @@ void kore_metal_command_list_draw_indexed(kore_gpu_command_list *list, uint32_t 
 	                                   indexCount:index_count
 	                                    indexType:list->metal.sixteen_bit_indices ? MTLIndexTypeUInt16 : MTLIndexTypeUInt32
 	                                  indexBuffer:index_buffer
-	                            indexBufferOffset:first_index
+	                            indexBufferOffset:first_index * (list->metal.sixteen_bit_indices ? sizeof(uint16_t) : sizeof(uint32_t))
 	                                instanceCount:instance_count
 	                                   baseVertex:base_vertex
 	                                 baseInstance:first_instance];
@@ -426,7 +432,9 @@ void kore_metal_command_list_set_viewport(kore_gpu_command_list *list, float x, 
 
 void kore_metal_command_list_set_scissor_rect(kore_gpu_command_list *list, uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
 	id<MTLRenderCommandEncoder> render_command_encoder = (__bridge id<MTLRenderCommandEncoder>)list->metal.render_command_encoder;
-	[render_command_encoder setScissorRect:(MTLScissorRect){x, y, width, height}];
+	if (render_command_encoder != nil) {
+		[render_command_encoder setScissorRect:(MTLScissorRect){x, y, width, height}];
+	}
 }
 
 void kore_metal_command_list_set_blend_constant(kore_gpu_command_list *list, kore_gpu_color color) {

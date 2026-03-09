@@ -6,6 +6,8 @@ project.addFile('sources/**');
 project.addFile('deployment/**');
 project.setDebugDir('deployment');
 
+project.addDefine('KORE_G2');
+
 project.addIncludeDir('../../build/Kong-osx-metal');
 project.addFile('../../build/Kong-osx-metal/kong.m');
 

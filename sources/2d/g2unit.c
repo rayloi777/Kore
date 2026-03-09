@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef KORE_G2
+
 #define MAX_BUFFER_SIZE 1000
 #define MAX_VERTICES (MAX_BUFFER_SIZE * 4)
 #define MAX_INDICES (MAX_BUFFER_SIZE * 6)
@@ -507,3 +509,5 @@ void kore_g2_scissor(int x, int y, int width, int height) {
 
 void kore_g2_disable_scissor(void) {
 }
+
+#endif
