@@ -35,6 +35,8 @@ static kore_gpu_texture      depth_texture;
 static bool     first_update = true;
 static uint64_t update_index = 0;
 static kore_gpu_buffer       mip_buffers[MIP_LEVELS * FACE_COUNT];
+static double last_time = 0.0;
+static float total_time = 0.0f;
 
 static void generate_mip_face(uint32_t *pixels, int size, int face_index, int mip_level) {
     int checker_size = size / 8;
@@ -64,7 +66,13 @@ static void generate_mip_face(uint32_t *pixels, int size, int face_index, int mi
 }
 
 static void update(void *data) {
-    float time_val = (float)kore_time();
+    double current_time = kore_timestamp() / (double)kore_frequency();
+    if (last_time == 0.0) {
+        last_time = current_time;
+    }
+    float delta_time = (float)(current_time - last_time);
+    last_time = current_time;
+    total_time += delta_time;
     
     kore_gpu_texture *framebuffer = kore_gpu_device_get_framebuffer(&device);
     float fb_width = (float)framebuffer->width;
@@ -77,16 +85,16 @@ static void update(void *data) {
     
     float cam_dist = 2.5f;
     kore_float3 cam_pos = {
-        sinf(time_val * 0.5f) * cam_dist,
+        sinf(total_time * 0.5f) * cam_dist,
         1.0f,
-        cosf(time_val * 0.5f) * cam_dist
+        cosf(total_time * 0.5f) * cam_dist
     };
     kore_float3 target = {0, 0, 0};
     kore_float3 up = {0, 1, 0};
     kore_matrix4x4 view = kore_matrix4x4_look_at(cam_pos, target, up);
     
-    kore_matrix4x4 model = kore_matrix4x4_rotation_y(time_val);
-    kore_matrix4x4 model_rot_x = kore_matrix4x4_rotation_x(time_val * 0.7f);
+    kore_matrix4x4 model = kore_matrix4x4_rotation_y(total_time);
+    kore_matrix4x4 model_rot_x = kore_matrix4x4_rotation_x(total_time * 0.7f);
     model = kore_matrix4x4_multiply(&model, &model_rot_x);
     
     kore_matrix4x4 mvp = kore_matrix4x4_identity();
