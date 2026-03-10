@@ -58,6 +58,42 @@ const index_buffer: {
 	padding: uint;
 };
 
+fun ray_triangle_intersect(ray_origin: float3, ray_dir: float3, v0: float3, v1: float3, v2: float3): float {
+	var EPSILON: float = 0.0000001;
+	
+	var edge1: float3 = v1 - v0;
+	var edge2: float3 = v2 - v0;
+	var h: float3 = cross(ray_dir, edge2);
+	var a: float = dot(edge1, h);
+	
+	if (a > -EPSILON && a < EPSILON) {
+		return -1.0;
+	}
+	
+	var f: float = 1.0 / a;
+	var s: float3 = ray_origin - v0;
+	var u: float = f * dot(s, h);
+	
+	if (u < 0.0 || u > 1.0) {
+		return -1.0;
+	}
+	
+	var q: float3 = cross(s, edge1);
+	var v: float = f * dot(ray_dir, q);
+	
+	if (v < 0.0 || u + v > 1.0) {
+		return -1.0;
+	}
+	
+	var t: float = f * dot(edge2, q);
+	
+	if (t > EPSILON) {
+		return t;
+	}
+	
+	return -1.0;
+}
+
 #[compute, threads(16, 16, 1)]
 fun comp(): void {
 	var idx: uint2 = dispatch_thread_id().xy;
@@ -99,179 +135,117 @@ fun comp(): void {
 	var closest_t: float = 100000.0;
 	var instance: float = 0.0;
 	
-	var inv_x: float = 1.0 / ray_dir.x;
-	var inv_y: float = 1.0 / ray_dir.y;
-	var inv_z: float = 1.0 / ray_dir.z;
+	var t: float = -1.0;
 	
-	var tall_min_x: float = -1.8;
-	var tall_max_x: float = -0.8;
-	var tall_min_y: float = -2.5;
-	var tall_max_y: float = -0.8;
-	var tall_min_z: float = -0.8;
-	var tall_max_z: float = 0.2;
+	var tall_v0: float3 = float3(-1.8, -2.5, -0.8);
+	var tall_v1: float3 = float3(-0.8, -2.5, -0.8);
+	var tall_v2: float3 = float3(-0.8, -0.8, -0.8);
+	var tall_v3: float3 = float3(-1.8, -0.8, -0.8);
+	var tall_v4: float3 = float3(-1.8, -2.5, 0.2);
+	var tall_v5: float3 = float3(-0.8, -2.5, 0.2);
+	var tall_v6: float3 = float3(-0.8, -0.8, 0.2);
+	var tall_v7: float3 = float3(-1.8, -0.8, 0.2);
 	
-	var t1x_tall: float = (tall_min_x - ray_origin.x) * inv_x;
-	var t2x_tall: float = (tall_max_x - ray_origin.x) * inv_x;
-	var t1y_tall: float = (tall_min_y - ray_origin.y) * inv_y;
-	var t2y_tall: float = (tall_max_y - ray_origin.y) * inv_y;
-	var t1z_tall: float = (tall_min_z - ray_origin.z) * inv_z;
-	var t2z_tall: float = (tall_max_z - ray_origin.z) * inv_z;
+	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v0, tall_v1, tall_v2);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v0, tall_v2, tall_v3);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v4, tall_v6, tall_v5);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v4, tall_v7, tall_v6);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v0, tall_v4, tall_v5);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v0, tall_v5, tall_v1);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v1, tall_v5, tall_v6);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v1, tall_v6, tall_v2);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v2, tall_v6, tall_v7);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v2, tall_v7, tall_v3);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v3, tall_v7, tall_v4);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v3, tall_v4, tall_v0);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
 	
-	var tmin_tall: float = max(max(min(t1x_tall, t2x_tall), min(t1y_tall, t2y_tall)), min(t1z_tall, t2z_tall));
-	var tmax_tall: float = min(min(max(t1x_tall, t2x_tall), max(t1y_tall, t2y_tall)), max(t1z_tall, t2z_tall));
+	var short_v0: float3 = float3(0.5, -2.5, -1.5);
+	var short_v1: float3 = float3(1.5, -2.5, -1.5);
+	var short_v2: float3 = float3(1.5, -1.8, -1.5);
+	var short_v3: float3 = float3(0.5, -1.8, -1.5);
+	var short_v4: float3 = float3(0.5, -2.5, -0.5);
+	var short_v5: float3 = float3(1.5, -2.5, -0.5);
+	var short_v6: float3 = float3(1.5, -1.8, -0.5);
+	var short_v7: float3 = float3(0.5, -1.8, -0.5);
 	
-	var tall_hit: bool = tmax_tall >= tmin_tall && tmax_tall > 0.0;
-	var tall_t: float = tmin_tall;
-	if (tall_hit && tmin_tall < 0.001) {
-		tall_t = tmax_tall;
-	}
-	
-	var short_min_x: float = 0.5;
-	var short_max_x: float = 1.5;
-	var short_min_y: float = -2.5;
-	var short_max_y: float = -1.8;
-	var short_min_z: float = -1.5;
-	var short_max_z: float = -0.5;
-	
-	var t1x_short: float = (short_min_x - ray_origin.x) * inv_x;
-	var t2x_short: float = (short_max_x - ray_origin.x) * inv_x;
-	var t1y_short: float = (short_min_y - ray_origin.y) * inv_y;
-	var t2y_short: float = (short_max_y - ray_origin.y) * inv_y;
-	var t1z_short: float = (short_min_z - ray_origin.z) * inv_z;
-	var t2z_short: float = (short_max_z - ray_origin.z) * inv_z;
-	
-	var tmin_short: float = max(max(min(t1x_short, t2x_short), min(t1y_short, t2y_short)), min(t1z_short, t2z_short));
-	var tmax_short: float = min(min(max(t1x_short, t2x_short), max(t1y_short, t2y_short)), max(t1z_short, t2z_short));
-	
-	var short_hit: bool = tmax_short >= tmin_short && tmax_short > 0.0;
-	var short_t: float = tmin_short;
-	if (short_hit && tmin_short < 0.001) {
-		short_t = tmax_short;
-	}
-	
-	if (tall_hit && tall_t < closest_t) {
-		closest_t = tall_t;
-		instance = 1.0;
-	}
-	
-	if (short_hit && short_t < closest_t) {
-		closest_t = short_t;
-		instance = 2.0;
-	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, short_v0, short_v1, short_v2);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, short_v0, short_v2, short_v3);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, short_v4, short_v6, short_v5);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, short_v4, short_v7, short_v6);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, short_v0, short_v4, short_v5);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, short_v0, short_v5, short_v1);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, short_v1, short_v5, short_v6);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, short_v1, short_v6, short_v2);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, short_v2, short_v6, short_v7);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, short_v2, short_v7, short_v3);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, short_v3, short_v7, short_v4);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, short_v3, short_v4, short_v0);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
 	
 	var wall_thick: float = 0.3;
 	
-	var left_min_x: float = -2.5 - wall_thick;
-	var left_max_x: float = -2.5;
-	var left_min_y: float = -2.5;
-	var left_max_y: float = 2.5;
-	var left_min_z: float = -2.5;
-	var left_max_z: float = 2.5;
+	var left_v0: float3 = float3(-2.5 - wall_thick, -2.5, -2.5);
+	var left_v1: float3 = float3(-2.5 - wall_thick, 2.5, -2.5);
+	var left_v2: float3 = float3(-2.5 - wall_thick, 2.5, 2.5);
+	var left_v3: float3 = float3(-2.5 - wall_thick, -2.5, 2.5);
 	
-	var t1x_left: float = (left_min_x - ray_origin.x) * inv_x;
-	var t2x_left: float = (left_max_x - ray_origin.x) * inv_x;
-	var t1y_left: float = (left_min_y - ray_origin.y) * inv_y;
-	var t2y_left: float = (left_max_y - ray_origin.y) * inv_y;
-	var t1z_left: float = (left_min_z - ray_origin.z) * inv_z;
-	var t2z_left: float = (left_max_z - ray_origin.z) * inv_z;
+	t = ray_triangle_intersect(ray_origin, ray_dir, left_v0, left_v1, left_v2);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 3.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, left_v0, left_v2, left_v3);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 3.0; }
 	
-	var tmin_left: float = max(max(min(t1x_left, t2x_left), min(t1y_left, t2y_left)), min(t1z_left, t2z_left));
-	var tmax_left: float = min(min(max(t1x_left, t2x_left), max(t1y_left, t2y_left)), max(t1z_left, t2z_left));
+	var right_v0: float3 = float3(2.5, -2.5, -2.5);
+	var right_v1: float3 = float3(2.5, 2.5, -2.5);
+	var right_v2: float3 = float3(2.5, 2.5, 2.5);
+	var right_v3: float3 = float3(2.5, -2.5, 2.5);
 	
-	var left_hit: bool = tmax_left >= tmin_left && tmax_left > 0.0;
-	var left_t: float = tmin_left;
-	if (left_hit && tmin_left < 0.001) {
-		left_t = tmax_left;
-	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, right_v0, right_v1, right_v2);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 4.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, right_v0, right_v2, right_v3);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 4.0; }
 	
-	var right_min_x: float = 2.5;
-	var right_max_x: float = 2.5 + wall_thick;
-	var right_min_y: float = -2.5;
-	var right_max_y: float = 2.5;
-	var right_min_z: float = -2.5;
-	var right_max_z: float = 2.5;
+	var floor_v0: float3 = float3(-2.5, -2.5 - wall_thick, -2.5);
+	var floor_v1: float3 = float3(2.5, -2.5 - wall_thick, -2.5);
+	var floor_v2: float3 = float3(2.5, -2.5 - wall_thick, 2.5);
+	var floor_v3: float3 = float3(-2.5, -2.5 - wall_thick, 2.5);
 	
-	var t1x_right: float = (right_min_x - ray_origin.x) * inv_x;
-	var t2x_right: float = (right_max_x - ray_origin.x) * inv_x;
-	var t1y_right: float = (right_min_y - ray_origin.y) * inv_y;
-	var t2y_right: float = (right_max_y - ray_origin.y) * inv_y;
-	var t1z_right: float = (right_min_z - ray_origin.z) * inv_z;
-	var t2z_right: float = (right_max_z - ray_origin.z) * inv_z;
+	t = ray_triangle_intersect(ray_origin, ray_dir, floor_v0, floor_v1, floor_v2);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 5.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, floor_v0, floor_v2, floor_v3);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 5.0; }
 	
-	var tmin_right: float = max(max(min(t1x_right, t2x_right), min(t1y_right, t2y_right)), min(t1z_right, t2z_right));
-	var tmax_right: float = min(min(max(t1x_right, t2x_right), max(t1y_right, t2y_right)), max(t1z_right, t2z_right));
+	var ceil_v0: float3 = float3(-2.5, 2.5 + wall_thick, -2.5);
+	var ceil_v1: float3 = float3(2.5, 2.5 + wall_thick, -2.5);
+	var ceil_v2: float3 = float3(2.5, 2.5 + wall_thick, 2.5);
+	var ceil_v3: float3 = float3(-2.5, 2.5 + wall_thick, 2.5);
 	
-	var right_hit: bool = tmax_right >= tmin_right && tmax_right > 0.0;
-	var right_t: float = tmin_right;
-	if (right_hit && tmin_right < 0.001) {
-		right_t = tmax_right;
-	}
-	
-	var floor_min_x: float = -2.5;
-	var floor_max_x: float = 2.5;
-	var floor_min_y: float = -2.5 - wall_thick;
-	var floor_max_y: float = -2.5;
-	var floor_min_z: float = -2.5;
-	var floor_max_z: float = 2.5;
-	
-	var t1x_floor: float = (floor_min_x - ray_origin.x) * inv_x;
-	var t2x_floor: float = (floor_max_x - ray_origin.x) * inv_x;
-	var t1y_floor: float = (floor_min_y - ray_origin.y) * inv_y;
-	var t2y_floor: float = (floor_max_y - ray_origin.y) * inv_y;
-	var t1z_floor: float = (floor_min_z - ray_origin.z) * inv_z;
-	var t2z_floor: float = (floor_max_z - ray_origin.z) * inv_z;
-	
-	var tmin_floor: float = max(max(min(t1x_floor, t2x_floor), min(t1y_floor, t2y_floor)), min(t1z_floor, t2z_floor));
-	var tmax_floor: float = min(min(max(t1x_floor, t2x_floor), max(t1y_floor, t2y_floor)), max(t1z_floor, t2z_floor));
-	
-	var floor_hit: bool = tmax_floor >= tmin_floor && tmax_floor > 0.0;
-	var floor_t: float = tmin_floor;
-	if (floor_hit && tmin_floor < 0.001) {
-		floor_t = tmax_floor;
-	}
-	
-	var ceil_min_x: float = -2.5;
-	var ceil_max_x: float = 2.5;
-	var ceil_min_y: float = 2.5;
-	var ceil_max_y: float = 2.5 + wall_thick;
-	var ceil_min_z: float = -2.5;
-	var ceil_max_z: float = 2.5;
-	
-	var t1x_ceil: float = (ceil_min_x - ray_origin.x) * inv_x;
-	var t2x_ceil: float = (ceil_max_x - ray_origin.x) * inv_x;
-	var t1y_ceil: float = (ceil_min_y - ray_origin.y) * inv_y;
-	var t2y_ceil: float = (ceil_max_y - ray_origin.y) * inv_y;
-	var t1z_ceil: float = (ceil_min_z - ray_origin.z) * inv_z;
-	var t2z_ceil: float = (ceil_max_z - ray_origin.z) * inv_z;
-	
-	var tmin_ceil: float = max(max(min(t1x_ceil, t2x_ceil), min(t1y_ceil, t2y_ceil)), min(t1z_ceil, t2z_ceil));
-	var tmax_ceil: float = min(min(max(t1x_ceil, t2x_ceil), max(t1y_ceil, t2y_ceil)), max(t1z_ceil, t2z_ceil));
-	
-	var ceil_hit: bool = tmax_ceil >= tmin_ceil && tmax_ceil > 0.0;
-	var ceil_t: float = tmin_ceil;
-	if (ceil_hit && tmin_ceil < 0.001) {
-		ceil_t = tmax_ceil;
-	}
-	
-	if (left_hit && left_t < closest_t) {
-		closest_t = left_t;
-		instance = 3.0;
-	}
-	
-	if (right_hit && right_t < closest_t) {
-		closest_t = right_t;
-		instance = 4.0;
-	}
-	
-	if (floor_hit && floor_t < closest_t) {
-		closest_t = floor_t;
-		instance = 5.0;
-	}
-	
-	if (ceil_hit && ceil_t < closest_t) {
-		closest_t = ceil_t;
-		instance = 6.0;
-	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, ceil_v0, ceil_v1, ceil_v2);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 6.0; }
+	t = ray_triangle_intersect(ray_origin, ray_dir, ceil_v0, ceil_v2, ceil_v3);
+	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 6.0; }
 	
 	var color: float3;
 	
