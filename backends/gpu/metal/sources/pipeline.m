@@ -437,36 +437,70 @@ void kore_metal_compute_pipeline_destroy(kore_metal_compute_pipeline *pipe) {
 }
 
 void kore_metal_ray_pipeline_init(kore_gpu_device *device, kore_metal_ray_pipeline *pipe, const kore_metal_ray_pipeline_parameters *parameters) {
-	if (@available(macOS 11.0, iOS 14.0, *)) {
-		id<MTLDevice> metal_device = (__bridge id<MTLDevice>)device->metal.device;
-		id<MTLLibrary> library = (__bridge id<MTLLibrary>)device->metal.library;
-		
-		if (parameters->gen_shader.function_name != NULL) {
-			id<MTLFunction> ray_gen_func = [library newFunctionWithName:[NSString stringWithCString:parameters->gen_shader.function_name encoding:NSUTF8StringEncoding]];
-			if (ray_gen_func != nil) {
-				NSError *error = nil;
-				pipe->ray_gen_pipeline = (__bridge_retained void *)[metal_device newComputePipelineStateWithFunction:ray_gen_func error:&error];
-			}
+#if __has_include(<Metal/MTLRayTracing.h>)
+	MTL_DEVICE_GET(metal_device, device);
+	MTL_LIBRARY_GET(library, device);
+
+	MTLRayTracingPipelineDescriptor *descriptor = [[MTLRayTracingPipelineDescriptor alloc] init];
+
+	if (parameters->gen_shader.function_name != NULL) {
+		id<MTLFunction> ray_gen_func = [library newFunctionWithName:[NSString stringWithCString:parameters->gen_shader.function_name encoding:NSUTF8StringEncoding]];
+		if (ray_gen_func != nil) {
+			[descriptor setRayGenFunction:ray_gen_func];
 		}
-		
-		if (parameters->miss_shader.function_name != NULL) {
-			id<MTLFunction> miss_func = [library newFunctionWithName:[NSString stringWithCString:parameters->miss_shader.function_name encoding:NSUTF8StringEncoding]];
-			if (miss_func != nil) {
-				NSError *error = nil;
-				pipe->miss_pipeline = (__bridge_retained void *)[metal_device newComputePipelineStateWithFunction:miss_func error:&error];
-			}
+	}
+
+	if (parameters->miss_shader.function_name != NULL) {
+		id<MTLFunction> miss_func = [library newFunctionWithName:[NSString stringWithCString:parameters->miss_shader.function_name encoding:NSUTF8StringEncoding]];
+		if (miss_func != nil) {
+			[descriptor setMissFunction:miss_func];
 		}
-		
+	}
+
+	if (parameters->closest_shader.function_name != NULL || parameters->any_shader.function_name != NULL || parameters->intersection_shader.function_name != NULL) {
+		MTLHitGroupDescriptor *hit_group = [[MTLHitGroupDescriptor alloc] init];
+
 		if (parameters->closest_shader.function_name != NULL) {
 			id<MTLFunction> closest_hit_func = [library newFunctionWithName:[NSString stringWithCString:parameters->closest_shader.function_name encoding:NSUTF8StringEncoding]];
 			if (closest_hit_func != nil) {
-				NSError *error = nil;
-				pipe->closest_hit_pipeline = (__bridge_retained void *)[metal_device newComputePipelineStateWithFunction:closest_hit_func error:&error];
+				[hit_group setClosestHitFunction:closest_hit_func];
 			}
 		}
-		
-		pipe->shader_binding_table = NULL;
+
+		if (parameters->any_shader.function_name != NULL) {
+			id<MTLFunction> any_hit_func = [library newFunctionWithName:[NSString stringWithCString:parameters->any_shader.function_name encoding:NSUTF8StringEncoding]];
+			if (any_hit_func != nil) {
+				[hit_group setAnyHitFunction:any_hit_func];
+			}
+		}
+
+		if (parameters->intersection_shader.function_name != NULL) {
+			id<MTLFunction> intersection_func = [library newFunctionWithName:[NSString stringWithCString:parameters->intersection_shader.function_name encoding:NSUTF8StringEncoding]];
+			if (intersection_func != nil) {
+				[hit_group setIntersectionFunction:intersection_func];
+			}
+		}
+
+		[descriptor setHitGroup:hit_group atIndex:0];
 	}
+
+	NSError *error = nil;
+	id<MTLRayTracingPipelineState> pipeline = [metal_device newRayTracingPipelineStateWithDescriptor:descriptor error:&error];
+	if (pipeline != nil && error == nil) {
+		pipe->ray_gen_pipeline = (__bridge_retained void *)pipeline;
+	}
+
+	pipe->shader_binding_table = NULL;
+#else
+	(void)device;
+	(void)parameters;
+	pipe->ray_gen_pipeline = NULL;
+	pipe->miss_pipeline = NULL;
+	pipe->closest_hit_pipeline = NULL;
+	pipe->intersection_pipeline = NULL;
+	pipe->any_hit_pipeline = NULL;
+	pipe->shader_binding_table = NULL;
+#endif
 }
 
 void kore_metal_ray_pipeline_destroy(kore_metal_ray_pipeline *pipe) {
