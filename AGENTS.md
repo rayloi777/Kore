@@ -83,11 +83,32 @@ open build/build/Release/computeshader_test.app
 ## RAYTRACING (METAL)
 - **Test:** `tests/raytracing_cornellbox/` - Cornell Box scene with rotating cube, mirror, and floor
 - **Build:** `./make -g metal --kore . --from tests/raytracing_cornellbox --compile`
-- **Metal backend fixes:**
-  - `backends/gpu/metal/sources/device.m` - Fixed NULL pointer dereference when index_buffer is NULL (unindexed geometry)
-- **Kongruent fixes in `Kongruent/sources/backends/metal.c`:**
-  - Added ray pipeline support (`#[raypipe]` - raygen, raymiss, rayclosesthit, rayintersection, rayanyhit)
-  - Added rayset type detection for shader parameters
-  - Fixed `var_name()` to handle globals with sets_count == 0
-  - Fixed function signature generation for ray shaders (no descriptor buffer params)
-- **Current limitation:** Metal Raytracing builtins (`ray_index`, `ray`, `trace_ray`, `world_ray_direction`, `primitive_index`, `object_to_world3x3`, `ray_length`) are not yet available in Xcode Metal compiler. Wait for Apple to release Metal Raytracing support.
+
+### Completed Fixes
+
+**Kore Metal backend (`backends/gpu/metal/sources/pipeline.m`):**
+- Updated `kore_metal_ray_pipeline_init` to use `MTLRayTracingPipelineState` with `MTLRayTracingPipelineDescriptor`
+- Added compile-time check `#if __has_include(<Metal/MTLRayTracing.h>)` to disable ray tracing when API unavailable
+
+**Kongruent Metal backend (`Kongruent/sources/backends/metal.c`):**
+- Added ray pipeline support (`#[raypipe]` - raygen, raymiss, rayclosesthit, rayintersection, rayanyhit)
+- Added rayset type detection for shader parameters
+- Fixed `var_name()` to handle globals with sets_count == 0
+- Fixed function signature generation for ray shaders (no descriptor buffer params)
+
+**Kongruent integration (`Kongruent/sources/integrations/kore3.c`):**
+- Fixed `kong_set_ray_pipeline_*` to use correct API: `kore_metal_command_list_set_ray_pipeline` instead of hardcoded D3D12
+- Fixed Metal ray pipeline parameter names: use `.gen_shader.function_name` instead of `.gen_shader_name`
+- Fixed Metal ray pipeline init call: 3 args (no root signature) instead of 4 args
+
+### Current Limitations
+
+1. **Metal Ray Tracing API not available:** The Metal Ray Tracing API (`MTLRayTracingPipelineDescriptor`, `MTLHitGroupDescriptor`, `MTLRayTracingPipelineState`) is not available in the current Xcode SDK (macOS 26.2). The ray pipeline code is stubbed out with `#if __has_include(<Metal/MTLRayTracing.h>)` until Apple releases the API.
+
+2. **Metal shader errors:** The generated Metal shader has compilation errors:
+   - Type mismatches (uint3 vs float3)
+   - Missing `min`/`max` members on ray type
+   - Undeclared `ray` variable in miss shader
+   - Ambiguous `fmod` call (needs explicit float type)
+   
+   These are Kongruent shader compiler issues that need to be fixed in the shader code generation.

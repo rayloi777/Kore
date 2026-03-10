@@ -220,6 +220,8 @@ typedef struct kore_metal_ray_pipeline_parameters {
 } kore_metal_ray_pipeline_parameters;
 
 typedef struct kore_metal_ray_pipeline {
+	void *ray_tracing_pipeline;
+	void *intersection_function_table;
 	void *ray_gen_pipeline;
 	void *miss_pipeline;
 	void *closest_hit_pipeline;
