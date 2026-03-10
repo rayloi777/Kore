@@ -20,6 +20,8 @@ static vertex_in_buffer      vertices;
 static kore_gpu_buffer       indices;
 static kore_gpu_buffer       constants;
 static kore_gpu_buffer       rc_buffer;
+static kore_gpu_buffer       vertex_buffer_storage;
+static kore_gpu_buffer       index_buffer_storage;
 static kore_gpu_texture      render_target_texture;
 static kore_gpu_sampler      sampler;
 static everything_set        everything;
@@ -211,6 +213,8 @@ int kickstart(int argc, char **argv) {
 
 	constants_type_buffer_create(&device, &constants, 1);
 	rc_type_buffer_create(&device, &rc_buffer, 1);
+	vertex_buffer_type_buffer_create(&device, &vertex_buffer_storage, 1);
+	index_buffer_type_buffer_create(&device, &index_buffer_storage, 1);
 
 	{
 		everything_parameters params = {
@@ -229,6 +233,8 @@ int kickstart(int argc, char **argv) {
 	{
 		compute_parameters params = {
 		    .rc = &rc_buffer,
+		    .vertex_buffer = &vertex_buffer_storage,
+		    .index_buffer = &index_buffer_storage,
 		    .render_target = {
 		        .texture = &render_target_texture,
 		        .base_mip_level = 0,
@@ -242,6 +248,8 @@ int kickstart(int argc, char **argv) {
 	kore_start();
 
 	kong_destroy_compute_set(&compute);
+	index_buffer_type_buffer_destroy(&index_buffer_storage);
+	vertex_buffer_type_buffer_destroy(&vertex_buffer_storage);
 	rc_type_buffer_destroy(&rc_buffer);
 	constants_type_buffer_destroy(&constants);
 	kong_destroy_everything_set(&everything);

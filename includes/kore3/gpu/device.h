@@ -66,6 +66,7 @@ typedef enum kore_gpu_buffer_usage {
 	KORE_GPU_BUFFER_USAGE_INDIRECT          = 0x0040,
 	KORE_GPU_BUFFER_USAGE_QUERY_RESOLVE     = 0x0080,
 	KORE_GPU_BUFFER_USAGE_RAYTRACING_VOLUME = 0x0100,
+	KORE_GPU_BUFFER_USAGE_STORAGE           = 0x0200,
 } kore_gpu_buffer_usage;
 
 typedef struct kore_gpu_buffer_parameters {
