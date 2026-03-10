@@ -1,162 +1,231 @@
-// based on https://landelare.github.io/2023/02/18/dxr-tutorial.html
-
-struct ray_payload {
-    color: float3;
-    allow_reflection: bool;
-    missed: bool;
+struct vertex_in {
+	pos: float3;
+	tex: float2;
 }
 
-#[set(rayset)]
-const scene: bvh;
-
-#[set(rayset), write]
-const render_target: tex2d;
-
-const camera: float3 = float3(0, 1.5, -7);
-const light: float3 = float3(0, 200, 0);
-const sky_top: float3 = float3(0.24, 0.44, 0.72);
-const sky_bottom: float3 = float3(0.75, 0.86, 0.93);
-
-fun sendrays(): void {
-    var idx: uint2 = ray_index().xy;
-    var size: float2 = ray_dimensions().xy;
-
-    var uv: float2 = idx / size;
-    var target: float3 = float3((uv.x * 2 - 1) * 1.8 * (size.x / size.y),
-                           (1 - uv.y) * 4 - 2 + camera.y,
-                           0);
-
-    var primary: ray;
-    primary.origin = camera;
-    primary.direction = target - camera;
-    primary.min = 0.001;
-    primary.max = 1000;
-
-    var payload: ray_payload;
-    payload.allow_reflection = true;
-    payload.missed = false;
-
-    trace_ray(scene, primary, payload);
-
-    render_target[idx] = float4(payload.color.r, payload.color.g, payload.color.b, 1);
+struct vertex_out {
+	pos: float4;
+	tex: float2;
 }
 
-fun raymissed(payload: ray_payload): void {
-    var slope: float = normalize(world_ray_direction()).y;
-    var t: float = saturate(slope * 5 + 0.5);
-    payload.color = lerp(sky_bottom, sky_top, t);
+#[set(everything)]
+const constants: {
+	mvp: float4x4;
+};
 
-    payload.missed = true;
+#[set(everything), set(compute)]
+const render_target: tex2d<TEXTURE_FORMAT_RGBA32_FLOAT>;
+
+#[set(everything)]
+const render_target_sampler: sampler;
+
+fun pix(input: vertex_out): float4 {
+	var c: float4 = sample(render_target, render_target_sampler, input.tex);
+	return float4(c.r, c.g, c.b, 1.0);
 }
 
-fun hit_cube(payload: ray_payload, uv: float2): void {
-    var tri: uint = primitive_index();
+fun pos(input: vertex_in): vertex_out {
+	var o: vertex_out;
+	o.pos = float4(input.pos.xy, 0.5, 1.0);
+	o.tex = input.tex;
+	return o;
+}
 
-    tri /= 2;
-    
-    var normal_x: float = 0.0;
-	if (tri % 3 == 0) {
-		if (tri < 3) {
-			normal_x = -1;
+#[pipe]
+struct pipeline {
+	vertex = pos;
+	fragment = pix;
+	format = framebuffer_format();
+}
+
+#[set(compute)]
+const rc: {
+	camera: float4;
+	light: float4;
+	sky_top: float4;
+	sky_bottom: float4;
+};
+
+#[compute, threads(16, 16, 1)]
+fun comp(): void {
+	var idx: uint2 = dispatch_thread_id().xy;
+	var screen_x: float = float(idx.x);
+	var screen_y: float = float(idx.y);
+	
+	var aspect: float = 800.0 / 600.0;
+	var fov: float = 1.0;
+	
+	var ray_x: float = (2.0 * screen_x / 800.0 - 1.0) * aspect * fov;
+	var ray_y: float = (1.0 - 2.0 * screen_y / 600.0) * fov;
+	
+	var ray_origin: float3 = rc.camera.xyz;
+	var yaw: float = rc.camera.w;
+	var pitch: float = rc.light.w;
+	
+	var cos_yaw: float = cos(yaw);
+	var sin_yaw: float = sin(yaw);
+	var cos_pitch: float = cos(pitch);
+	var sin_pitch: float = sin(pitch);
+	
+	var forward_x: float = sin_yaw * cos_pitch;
+	var forward_y: float = sin_pitch;
+	var forward_z: float = cos_yaw * cos_pitch;
+	
+	var right_x: float = cos_yaw;
+	var right_y: float = 0.0;
+	var right_z: float = -sin_yaw;	
+	var up_x: float = -sin_yaw * sin_pitch;
+	var up_y: float = cos_pitch;
+	var up_z: float = -cos_yaw * sin_pitch;
+	
+	var ray_dir: float3 = normalize(float3(
+		forward_x + ray_x * right_x + ray_y * up_x,
+		forward_y + ray_y * up_y,
+		forward_z + ray_x * right_z + ray_y * up_z
+	));
+	
+	var closest_t: float = 100000.0;
+	var instance: float = 0.0;
+	
+	var inv_x: float = 1.0 / ray_dir.x;
+	var inv_y: float = 1.0 / ray_dir.y;
+	var inv_z: float = 1.0 / ray_dir.z;
+	
+	var tall_min_x: float = -1.8;
+	var tall_max_x: float = -0.8;
+	var tall_min_y: float = -2.5;
+	var tall_max_y: float = -0.8;
+	var tall_min_z: float = -0.8;
+	var tall_max_z: float = 0.2;
+	
+	var t1x_tall: float = (tall_min_x - ray_origin.x) * inv_x;
+	var t2x_tall: float = (tall_max_x - ray_origin.x) * inv_x;
+	var t1y_tall: float = (tall_min_y - ray_origin.y) * inv_y;
+	var t2y_tall: float = (tall_max_y - ray_origin.y) * inv_y;
+	var t1z_tall: float = (tall_min_z - ray_origin.z) * inv_z;
+	var t2z_tall: float = (tall_max_z - ray_origin.z) * inv_z;
+	
+	var tmin_tall: float = max(max(min(t1x_tall, t2x_tall), min(t1y_tall, t2y_tall)), min(t1z_tall, t2z_tall));
+	var tmax_tall: float = min(min(max(t1x_tall, t2x_tall), max(t1y_tall, t2y_tall)), max(t1z_tall, t2z_tall));
+	
+	var tall_hit: bool = tmax_tall >= tmin_tall && tmax_tall > 0.0;
+	var tall_t: float = tmin_tall;
+	if (tall_hit && tmin_tall < 0.001) {
+		tall_t = tmax_tall;
+	}
+	
+	var short_min_x: float = 0.5;
+	var short_max_x: float = 1.5;
+	var short_min_y: float = -2.5;
+	var short_max_y: float = -1.8;
+	var short_min_z: float = -1.5;
+	var short_max_z: float = -0.5;
+	
+	var t1x_short: float = (short_min_x - ray_origin.x) * inv_x;
+	var t2x_short: float = (short_max_x - ray_origin.x) * inv_x;
+	var t1y_short: float = (short_min_y - ray_origin.y) * inv_y;
+	var t2y_short: float = (short_max_y - ray_origin.y) * inv_y;
+	var t1z_short: float = (short_min_z - ray_origin.z) * inv_z;
+	var t2z_short: float = (short_max_z - ray_origin.z) * inv_z;
+	
+	var tmin_short: float = max(max(min(t1x_short, t2x_short), min(t1y_short, t2y_short)), min(t1z_short, t2z_short));
+	var tmax_short: float = min(min(max(t1x_short, t2x_short), max(t1y_short, t2y_short)), max(t1z_short, t2z_short));
+	
+	var short_hit: bool = tmax_short >= tmin_short && tmax_short > 0.0;
+	var short_t: float = tmin_short;
+	if (short_hit && tmin_short < 0.001) {
+		short_t = tmax_short;
+	}
+	
+	if (tall_hit && tall_t < closest_t) {
+		closest_t = tall_t;
+		instance = 1.0;
+	}
+	
+	if (short_hit && short_t < closest_t) {
+		closest_t = short_t;
+		instance = 2.0;
+	}
+	
+	var left_t: float = -2.5 - ray_origin.x;
+	var right_t: float = 2.5 - ray_origin.x;
+	var bottom_t: float = -2.5 - ray_origin.y;
+	var top_t: float = 2.5 - ray_origin.y;
+	var back_t: float = 2.5 - ray_origin.z;
+	var front_t: float = -2.5 - ray_origin.z;
+	
+	var t1x: float = left_t * inv_x;
+	var t2x: float = right_t * inv_x;
+	var t1y: float = bottom_t * inv_y;
+	var t2y: float = top_t * inv_y;
+	var t1z: float = front_t * inv_z;
+	var t2z: float = back_t * inv_z;
+	
+	var tmin_x: float = min(t1x, t2x);
+	var tmax_x: float = max(t1x, t2x);
+	var tmin_y: float = min(t1y, t2y);
+	var tmax_y: float = max(t1y, t2y);
+	var tmin_z: float = min(t1z, t2z);
+	var tmax_z: float = max(t1z, t2z);
+	
+	var tmin: float = max(max(tmin_x, tmin_y), tmin_z);
+	var tmax: float = min(min(tmax_x, tmax_y), tmax_z);
+	
+	var room_hit: bool = tmax >= tmin && tmax > 0.0;
+	if (room_hit) {
+		var t: float = tmin;
+		if (t < 0.001) {
+			t = tmax;
+		}
+		if (t < closest_t) {
+			closest_t = t;
+			instance = 3.0;
+		}
+	}
+	
+	var color: float3;
+	
+	if (instance < 0.5) {
+		var slope: float = ray_dir.y;
+		var t: float = saturate(slope * 5.0 + 0.5);
+		color = lerp(rc.sky_bottom.xyz, rc.sky_top.xyz, t);
+	}
+	
+	if (instance > 0.5 && instance < 1.5) {
+		color = float3(0.9, 0.9, 0.9);
+	}
+	
+	if (instance > 1.5 && instance < 2.5) {
+		color = float3(0.9, 0.9, 0.9);
+	}
+	
+	if (instance > 2.5) {
+		var hit_pos: float3 = ray_origin + ray_dir * closest_t;
+		
+		var wall_threshold: float = 0.3;
+		
+		if (abs(hit_pos.y - 2.5) < wall_threshold) {
+			color = float3(0.9, 0.9, 0.9);
 		}
 		else {
-			normal_x = 1;
+			if (abs(hit_pos.y - (-2.5)) < wall_threshold) {
+				color = float3(0.5, 0.5, 0.5);
+			}
+			else {
+				if (abs(hit_pos.x - (-2.5)) < wall_threshold) {
+					color = float3(0.9, 0.1, 0.1);
+				}
+				else {
+					if (abs(hit_pos.x - 2.5) < wall_threshold) {
+						color = float3(0.1, 0.9, 0.1);
+					}
+					else {
+						color = float3(0.9, 0.9, 0.9);
+					}
+				}
+			}
 		}
 	}
-
-	var normal_y: float = 0.0;
-	if (tri % 3 == 1) {
-		if (tri < 3) {
-			normal_y = -1;
-		}
-		else {
-			normal_y = 1;
-		}
-	}
-
-	var normal_z: float = 0.0;
-	if (tri % 3 == 2) {
-		if (tri < 3) {
-			normal_z = -1;
-		}
-		else {
-			normal_z = 1;
-		}
-	}
-
-	var normal: float3 = float3(normal_x, normal_y, normal_z);
-
-    var worldNormal: float3 = normalize(object_to_world3x3() * normal);
-
-    var color: float3 = abs(normal) / 3.0 + 0.5;
-    if (uv.x < 0.03 || uv.y < 0.03) {
-        color = float3(0.25, 0.25, 0.25);
-    }
-
-    color *= saturate(dot(worldNormal, normalize(light))) + 0.33;
-    payload.color = color;
-}
-
-fun hit_mirror(payload: ray_payload, uv: float2): void {
-    if (payload.allow_reflection) {
-		var pos: float3 = world_ray_origin() + world_ray_direction() * ray_length();
-		var normal: float3 = normalize(object_to_world3x3() * float3(0, 1, 0));
-	    var reflected: float3 = reflect(normalize(world_ray_direction()), normal);
-
-	    var mirrorRay: ray;
-	    mirrorRay.origin = pos;
-	    mirrorRay.direction = reflected;
-	    mirrorRay.min = 0.001;
-	    mirrorRay.max = 1000;
-
-	    payload.allow_reflection = false;
-	    trace_ray(scene, mirrorRay, payload);
-	}
-}
-
-fun hit_floor(payload: ray_payload, uv: float2): void {
-    var pos: float3 = world_ray_origin() + world_ray_direction() * ray_length();
-
-    var pattern_x: bool = frac(pos.x) > 0.5;
-    var pattern_y: bool = frac(pos.z) > 0.5;
-    if (pattern_x ^ pattern_y) {
-    	payload.color = float3(0.6, 0.6, 0.6);
-    }
-    else {
-    	payload.color = float3(0.4, 0.4, 0.4);
-    }
-
-    var shadowRay: ray;
-    shadowRay.origin = pos;
-    shadowRay.direction = light - pos;
-    shadowRay.min = 0.001;
-    shadowRay.max = 1;
-
-    var shadow: ray_payload;
-    shadow.allow_reflection = false;
-    shadow.missed = false;
-    trace_ray(scene, shadowRay, shadow);
-
-    if (!shadow.missed) {
-        payload.color /= 2.0;
-    }
-}
-
-fun closesthit(payload: ray_payload, uv: float2): void {
-	if (instance_id() == 0) {
-		hit_cube(payload, uv);
-	}
-	else if (instance_id() == 1) {
-		hit_mirror(payload, uv);
-	}
-	else if (instance_id() == 2) {
-		hit_floor(payload, uv);
-	}
-}
-
-#[raypipe]
-struct ray_pipe {
-    gen = sendrays;
-    miss = raymissed;
-    closest = closesthit;
+	
+	render_target[idx] = float4(color, 1.0);
 }
