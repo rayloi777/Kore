@@ -80,15 +80,31 @@ open build/build/Release/computeshader_test.app
   ```
 - **Affected tests:** cube_texture_test, cube_test, triangle, text_test, image_compress all need this fix
 
-## RAYTRACING (METAL)
-- **Test:** `tests/raytracing_cornellbox/` - Cornell Box scene with rotating cube, mirror, and floor
+## RAYTRACING (COMPUTE SHADER)
+- **Test:** `tests/raytracing_cornellbox/` - Cornell Box scene with boxes and colored walls
 - **Build:** `./make -g metal --kore . --from tests/raytracing_cornellbox --compile`
 
-### Completed Fixes
+### Features
+- Compute shader-based ray tracing (no Metal Ray Tracing API)
+- Manual ray-box intersection for all geometry
+- Cornell Box scene: tall box, short box, left wall (red), right wall (green), floor (gray), ceiling (white)
+- Open back wall (viewable to sky)
+- Thick walls (0.3 units) for proper geometry
 
-**Kore Metal backend (`backends/gpu/metal/sources/pipeline.m`):**
-- Updated `kore_metal_ray_pipeline_init` to use `MTLRayTracingPipelineState` with `MTLRayTracingPipelineDescriptor`
-- Added compile-time check `#if __has_include(<Metal/MTLRayTracing.h>)` to disable ray tracing when API unavailable
+### Controls
+- **WASD**: Move camera horizontally
+- **Q/E**: Move camera up/down
+- **Mouse**: Look around (click window first to enable mouse capture)
+
+### Implementation Details
+- Uses compute shader with `#[compute, threads(16, 16, 1)]` dispatch
+- Ray direction calculated from yaw/pitch angles passed via uniform buffer
+- Box intersection: AABB slab method with separate tests for each object
+- Scene bounds: -2.5 to 2.5 in X/Y/Z
+
+### Historical Notes
+
+The original implementation used Metal's Ray Tracing API (`MTLRayTracingPipelineDescriptor`, etc.), but this API was not available in the Xcode SDK (macOS 26.2). The API has since been stubbed out with `#if __has_include(<Metal/MTLRayTracing.h>)`.
 
 **Kongruent Metal backend (`Kongruent/sources/backends/metal.c`):**
 - Added ray pipeline support (`#[raypipe]` - raygen, raymiss, rayclosesthit, rayintersection, rayanyhit)
@@ -97,18 +113,5 @@ open build/build/Release/computeshader_test.app
 - Fixed function signature generation for ray shaders (no descriptor buffer params)
 
 **Kongruent integration (`Kongruent/sources/integrations/kore3.c`):**
-- Fixed `kong_set_ray_pipeline_*` to use correct API: `kore_metal_command_list_set_ray_pipeline` instead of hardcoded D3D12
-- Fixed Metal ray pipeline parameter names: use `.gen_shader.function_name` instead of `.gen_shader_name`
-- Fixed Metal ray pipeline init call: 3 args (no root signature) instead of 4 args
-
-### Current Limitations
-
-1. **Metal Ray Tracing API not available:** The Metal Ray Tracing API (`MTLRayTracingPipelineDescriptor`, `MTLHitGroupDescriptor`, `MTLRayTracingPipelineState`) is not available in the current Xcode SDK (macOS 26.2). The ray pipeline code is stubbed out with `#if __has_include(<Metal/MTLRayTracing.h>)` until Apple releases the API.
-
-2. **Metal shader errors:** The generated Metal shader has compilation errors:
-   - Type mismatches (uint3 vs float3)
-   - Missing `min`/`max` members on ray type
-   - Undeclared `ray` variable in miss shader
-   - Ambiguous `fmod` call (needs explicit float type)
-   
-   These are Kongruent shader compiler issues that need to be fixed in the shader code generation.
+- Fixed `kong_set_ray_pipeline_*` to use correct API
+- Fixed Metal ray pipeline parameter names
