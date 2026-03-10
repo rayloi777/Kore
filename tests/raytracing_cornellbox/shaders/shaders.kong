@@ -147,40 +147,118 @@ fun comp(): void {
 		instance = 2.0;
 	}
 	
-	var left_t: float = -2.5 - ray_origin.x;
-	var right_t: float = 2.5 - ray_origin.x;
-	var bottom_t: float = -2.5 - ray_origin.y;
-	var top_t: float = 2.5 - ray_origin.y;
-	var back_t: float = 2.5 - ray_origin.z;
-	var front_t: float = -2.5 - ray_origin.z;
+	var wall_thick: float = 0.3;
 	
-	var t1x: float = left_t * inv_x;
-	var t2x: float = right_t * inv_x;
-	var t1y: float = bottom_t * inv_y;
-	var t2y: float = top_t * inv_y;
-	var t1z: float = front_t * inv_z;
-	var t2z: float = back_t * inv_z;
+	var left_min_x: float = -2.5 - wall_thick;
+	var left_max_x: float = -2.5;
+	var left_min_y: float = -2.5;
+	var left_max_y: float = 2.5;
+	var left_min_z: float = -2.5;
+	var left_max_z: float = 2.5;
 	
-	var tmin_x: float = min(t1x, t2x);
-	var tmax_x: float = max(t1x, t2x);
-	var tmin_y: float = min(t1y, t2y);
-	var tmax_y: float = max(t1y, t2y);
-	var tmin_z: float = min(t1z, t2z);
-	var tmax_z: float = max(t1z, t2z);
+	var t1x_left: float = (left_min_x - ray_origin.x) * inv_x;
+	var t2x_left: float = (left_max_x - ray_origin.x) * inv_x;
+	var t1y_left: float = (left_min_y - ray_origin.y) * inv_y;
+	var t2y_left: float = (left_max_y - ray_origin.y) * inv_y;
+	var t1z_left: float = (left_min_z - ray_origin.z) * inv_z;
+	var t2z_left: float = (left_max_z - ray_origin.z) * inv_z;
 	
-	var tmin: float = max(max(tmin_x, tmin_y), tmin_z);
-	var tmax: float = min(min(tmax_x, tmax_y), tmax_z);
+	var tmin_left: float = max(max(min(t1x_left, t2x_left), min(t1y_left, t2y_left)), min(t1z_left, t2z_left));
+	var tmax_left: float = min(min(max(t1x_left, t2x_left), max(t1y_left, t2y_left)), max(t1z_left, t2z_left));
 	
-	var room_hit: bool = tmax >= tmin && tmax > 0.0;
-	if (room_hit) {
-		var t: float = tmin;
-		if (t < 0.001) {
-			t = tmax;
-		}
-		if (t < closest_t) {
-			closest_t = t;
-			instance = 3.0;
-		}
+	var left_hit: bool = tmax_left >= tmin_left && tmax_left > 0.0;
+	var left_t: float = tmin_left;
+	if (left_hit && tmin_left < 0.001) {
+		left_t = tmax_left;
+	}
+	
+	var right_min_x: float = 2.5;
+	var right_max_x: float = 2.5 + wall_thick;
+	var right_min_y: float = -2.5;
+	var right_max_y: float = 2.5;
+	var right_min_z: float = -2.5;
+	var right_max_z: float = 2.5;
+	
+	var t1x_right: float = (right_min_x - ray_origin.x) * inv_x;
+	var t2x_right: float = (right_max_x - ray_origin.x) * inv_x;
+	var t1y_right: float = (right_min_y - ray_origin.y) * inv_y;
+	var t2y_right: float = (right_max_y - ray_origin.y) * inv_y;
+	var t1z_right: float = (right_min_z - ray_origin.z) * inv_z;
+	var t2z_right: float = (right_max_z - ray_origin.z) * inv_z;
+	
+	var tmin_right: float = max(max(min(t1x_right, t2x_right), min(t1y_right, t2y_right)), min(t1z_right, t2z_right));
+	var tmax_right: float = min(min(max(t1x_right, t2x_right), max(t1y_right, t2y_right)), max(t1z_right, t2z_right));
+	
+	var right_hit: bool = tmax_right >= tmin_right && tmax_right > 0.0;
+	var right_t: float = tmin_right;
+	if (right_hit && tmin_right < 0.001) {
+		right_t = tmax_right;
+	}
+	
+	var floor_min_x: float = -2.5;
+	var floor_max_x: float = 2.5;
+	var floor_min_y: float = -2.5 - wall_thick;
+	var floor_max_y: float = -2.5;
+	var floor_min_z: float = -2.5;
+	var floor_max_z: float = 2.5;
+	
+	var t1x_floor: float = (floor_min_x - ray_origin.x) * inv_x;
+	var t2x_floor: float = (floor_max_x - ray_origin.x) * inv_x;
+	var t1y_floor: float = (floor_min_y - ray_origin.y) * inv_y;
+	var t2y_floor: float = (floor_max_y - ray_origin.y) * inv_y;
+	var t1z_floor: float = (floor_min_z - ray_origin.z) * inv_z;
+	var t2z_floor: float = (floor_max_z - ray_origin.z) * inv_z;
+	
+	var tmin_floor: float = max(max(min(t1x_floor, t2x_floor), min(t1y_floor, t2y_floor)), min(t1z_floor, t2z_floor));
+	var tmax_floor: float = min(min(max(t1x_floor, t2x_floor), max(t1y_floor, t2y_floor)), max(t1z_floor, t2z_floor));
+	
+	var floor_hit: bool = tmax_floor >= tmin_floor && tmax_floor > 0.0;
+	var floor_t: float = tmin_floor;
+	if (floor_hit && tmin_floor < 0.001) {
+		floor_t = tmax_floor;
+	}
+	
+	var ceil_min_x: float = -2.5;
+	var ceil_max_x: float = 2.5;
+	var ceil_min_y: float = 2.5;
+	var ceil_max_y: float = 2.5 + wall_thick;
+	var ceil_min_z: float = -2.5;
+	var ceil_max_z: float = 2.5;
+	
+	var t1x_ceil: float = (ceil_min_x - ray_origin.x) * inv_x;
+	var t2x_ceil: float = (ceil_max_x - ray_origin.x) * inv_x;
+	var t1y_ceil: float = (ceil_min_y - ray_origin.y) * inv_y;
+	var t2y_ceil: float = (ceil_max_y - ray_origin.y) * inv_y;
+	var t1z_ceil: float = (ceil_min_z - ray_origin.z) * inv_z;
+	var t2z_ceil: float = (ceil_max_z - ray_origin.z) * inv_z;
+	
+	var tmin_ceil: float = max(max(min(t1x_ceil, t2x_ceil), min(t1y_ceil, t2y_ceil)), min(t1z_ceil, t2z_ceil));
+	var tmax_ceil: float = min(min(max(t1x_ceil, t2x_ceil), max(t1y_ceil, t2y_ceil)), max(t1z_ceil, t2z_ceil));
+	
+	var ceil_hit: bool = tmax_ceil >= tmin_ceil && tmax_ceil > 0.0;
+	var ceil_t: float = tmin_ceil;
+	if (ceil_hit && tmin_ceil < 0.001) {
+		ceil_t = tmax_ceil;
+	}
+	
+	if (left_hit && left_t < closest_t) {
+		closest_t = left_t;
+		instance = 3.0;
+	}
+	
+	if (right_hit && right_t < closest_t) {
+		closest_t = right_t;
+		instance = 4.0;
+	}
+	
+	if (floor_hit && floor_t < closest_t) {
+		closest_t = floor_t;
+		instance = 5.0;
+	}
+	
+	if (ceil_hit && ceil_t < closest_t) {
+		closest_t = ceil_t;
+		instance = 6.0;
 	}
 	
 	var color: float3;
@@ -199,32 +277,20 @@ fun comp(): void {
 		color = float3(0.9, 0.9, 0.9);
 	}
 	
-	if (instance > 2.5) {
-		var hit_pos: float3 = ray_origin + ray_dir * closest_t;
-		
-		var wall_threshold: float = 0.3;
-		
-		if (abs(hit_pos.y - 2.5) < wall_threshold) {
-			color = float3(0.9, 0.9, 0.9);
-		}
-		else {
-			if (abs(hit_pos.y - (-2.5)) < wall_threshold) {
-				color = float3(0.5, 0.5, 0.5);
-			}
-			else {
-				if (abs(hit_pos.x - (-2.5)) < wall_threshold) {
-					color = float3(0.9, 0.1, 0.1);
-				}
-				else {
-					if (abs(hit_pos.x - 2.5) < wall_threshold) {
-						color = float3(0.1, 0.9, 0.1);
-					}
-					else {
-						color = float3(0.9, 0.9, 0.9);
-					}
-				}
-			}
-		}
+	if (instance > 2.5 && instance < 3.5) {
+		color = float3(0.9, 0.1, 0.1);
+	}
+	
+	if (instance > 3.5 && instance < 4.5) {
+		color = float3(0.1, 0.9, 0.1);
+	}
+	
+	if (instance > 4.5 && instance < 5.5) {
+		color = float3(0.5, 0.5, 0.5);
+	}
+	
+	if (instance > 5.5) {
+		color = float3(0.9, 0.9, 0.9);
 	}
 	
 	render_target[idx] = float4(color, 1.0);
