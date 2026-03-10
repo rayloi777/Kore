@@ -16,3 +16,4 @@ compile_commands.json
 .vscode/**
 **/deployment/**
 !**/deployment/keepme*
+tools/macos_arm64

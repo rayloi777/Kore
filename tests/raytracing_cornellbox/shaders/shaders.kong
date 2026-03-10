@@ -46,237 +46,672 @@ const rc: {
 	sky_bottom: float4;
 };
 
-#[set(compute), storage]
-const vertex_buffer: {
-	v0: float3;
-	padding: float;
-};
-
-#[set(compute), storage]
-const index_buffer: {
-	count: uint;
-	padding: uint;
-};
-
 fun ray_triangle_intersect(ray_origin: float3, ray_dir: float3, v0: float3, v1: float3, v2: float3): float {
 	var EPSILON: float = 0.0000001;
-	
 	var edge1: float3 = v1 - v0;
 	var edge2: float3 = v2 - v0;
 	var h: float3 = cross(ray_dir, edge2);
 	var a: float = dot(edge1, h);
-	
-	if (a > -EPSILON && a < EPSILON) {
-		return -1.0;
+	if (a > -EPSILON) {
+		if (a < EPSILON) {
+			return -1.0;
+		}
 	}
-	
 	var f: float = 1.0 / a;
 	var s: float3 = ray_origin - v0;
 	var u: float = f * dot(s, h);
-	
-	if (u < 0.0 || u > 1.0) {
+	if (u < 0.0) {
 		return -1.0;
 	}
-	
+	if (u > 1.0) {
+		return -1.0;
+	}
 	var q: float3 = cross(s, edge1);
 	var v: float = f * dot(ray_dir, q);
-	
-	if (v < 0.0 || u + v > 1.0) {
+	if (v < 0.0) {
 		return -1.0;
 	}
-	
+	if (u + v > 1.0) {
+		return -1.0;
+	}
 	var t: float = f * dot(edge2, q);
-	
 	if (t > EPSILON) {
 		return t;
 	}
-	
 	return -1.0;
+}
+
+fun ray_box_intersect(ray_origin: float3, ray_dir: float3, box_min: float3, box_max: float3): float {
+	var inv_dir_x: float = 1.0 / ray_dir.x;
+	var inv_dir_y: float = 1.0 / ray_dir.y;
+	var inv_dir_z: float = 1.0 / ray_dir.z;
+	var t0_x: float = (box_min.x - ray_origin.x) * inv_dir_x;
+	var t1_x: float = (box_max.x - ray_origin.x) * inv_dir_x;
+	var t0_y: float = (box_min.y - ray_origin.y) * inv_dir_y;
+	var t1_y: float = (box_max.y - ray_origin.y) * inv_dir_y;
+	var t0_z: float = (box_min.z - ray_origin.z) * inv_dir_z;
+	var t1_z: float = (box_max.z - ray_origin.z) * inv_dir_z;
+	var tmin_x: float;
+	if (t0_x < t1_x) { tmin_x = t0_x; } else { tmin_x = t1_x; }
+	var tmax_x: float;
+	if (t0_x > t1_x) { tmax_x = t0_x; } else { tmax_x = t1_x; }
+	var tmin_y: float;
+	if (t0_y < t1_y) { tmin_y = t0_y; } else { tmin_y = t1_y; }
+	var tmax_y: float;
+	if (t0_y > t1_y) { tmax_y = t0_y; } else { tmax_y = t1_y; }
+	var tmin_z: float;
+	if (t0_z < t1_z) { tmin_z = t0_z; } else { tmin_z = t1_z; }
+	var tmax_z: float;
+	if (t0_z > t1_z) { tmax_z = t0_z; } else { tmax_z = t1_z; }
+	var t_near: float;
+	if (tmin_x > tmin_y) { t_near = tmin_x; } else { t_near = tmin_y; }
+	if (t_near > tmin_z) { } else { t_near = tmin_z; }
+	var t_far: float;
+	if (tmax_x < tmax_y) { t_far = tmax_x; } else { t_far = tmax_y; }
+	if (t_far < tmax_z) { } else { t_far = tmax_z; }
+	if (t_near > t_far || t_far < 0.0) {
+		return -1.0;
+	}
+	if (t_near > 0.0) {
+		return t_near;
+	}
+	return t_far;
+}
+
+fun trace_scene(ray_origin: float3, ray_dir: float3): float2 {
+	var closest_t: float = 100000.0;
+	var instance: float = 0.0;
+	
+	var wall_thick: float = 0.3;
+	var room_min: float = -2.5;
+	var room_max: float = 2.5;
+	
+	// Left wall (red) - solid box
+	var left_min: float3 = float3(room_min - wall_thick, room_min - wall_thick, room_min - wall_thick);
+	var left_max: float3 = float3(room_min, room_max + wall_thick, room_max + wall_thick);
+	var t: float = ray_box_intersect(ray_origin, ray_dir, left_min, left_max);
+	var hit: bool = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 3.0; }
+	}
+	
+	// Right wall (green) - solid box
+	var right_min: float3 = float3(room_max, room_min - wall_thick, room_min - wall_thick);
+	var right_max: float3 = float3(room_max + wall_thick, room_max + wall_thick, room_max + wall_thick);
+	t = ray_box_intersect(ray_origin, ray_dir, right_min, right_max);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 4.0; }
+	}
+	
+	// Back wall - solid box
+	var back_min: float3 = float3(room_min - wall_thick, room_min - wall_thick, room_min - wall_thick);
+	var back_max: float3 = float3(room_max + wall_thick, room_max + wall_thick, room_min);
+	t = ray_box_intersect(ray_origin, ray_dir, back_min, back_max);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 8.0; }
+	}
+	
+	// Floor - solid box
+	var floor_min: float3 = float3(room_min - wall_thick, room_min - wall_thick, room_min - wall_thick);
+	var floor_max: float3 = float3(room_max + wall_thick, room_min, room_max + wall_thick);
+	t = ray_box_intersect(ray_origin, ray_dir, floor_min, floor_max);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 5.0; }
+	}
+	
+	// Ceiling - solid box
+	var ceil_min: float3 = float3(room_min - wall_thick, room_max, room_min - wall_thick);
+	var ceil_max: float3 = float3(room_max + wall_thick, room_max + wall_thick, room_max + wall_thick);
+	t = ray_box_intersect(ray_origin, ray_dir, ceil_min, ceil_max);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 6.0; }
+	}
+	
+	// Light (ceiling light plane)
+	var light_size: float = 0.8;
+	var light_y: float = 2.5 + 0.3;
+	var light_v0: float3 = float3(-light_size, light_y, -light_size);
+	var light_v1: float3 = float3(light_size, light_y, -light_size);
+	var light_v2: float3 = float3(light_size, light_y, light_size);
+	var light_v3: float3 = float3(-light_size, light_y, light_size);
+	
+	t = ray_triangle_intersect(ray_origin, ray_dir, light_v0, light_v1, light_v2);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 7.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, light_v0, light_v2, light_v3);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 7.0; }
+	}
+	
+	var c45: float = 0.70710678;
+	var s45: float = 0.70710678;
+	var tall_cx: float = -1.0;
+	var tall_cy: float = -1.65;
+	var tall_cz: float = -0.3;
+	var tall_half: float = 0.5;
+	var tall_h: float = 1.7;
+	var tall_x0: float = tall_cx - tall_half;
+	var tall_x1: float = tall_cx + tall_half;
+	var tall_z0: float = tall_cz - tall_half;
+	var tall_z1: float = tall_cz + tall_half;
+	var tall_y0: float = tall_cy - tall_h * 0.5;
+	var tall_y1: float = tall_cy + tall_h * 0.5;
+	
+	var tv7: float3 = float3(tall_x0 * c45 - tall_z1 * s45, tall_y0, tall_x0 * s45 + tall_z1 * c45);
+	var tv6: float3 = float3(tall_x1 * c45 - tall_z1 * s45, tall_y0, tall_x1 * s45 + tall_z1 * c45);
+	var tv2: float3 = float3(tall_x1 * c45 - tall_z1 * s45, tall_y1, tall_x1 * s45 + tall_z1 * c45);
+	var tv3: float3 = float3(tall_x0 * c45 - tall_z1 * s45, tall_y1, tall_x0 * s45 + tall_z1 * c45);
+	var tv4: float3 = float3(tall_x0 * c45 - tall_z0 * s45, tall_y1, tall_x0 * s45 + tall_z0 * c45);
+	var tv5: float3 = float3(tall_x1 * c45 - tall_z0 * s45, tall_y1, tall_x1 * s45 + tall_z0 * c45);
+	var tv1: float3 = float3(tall_x1 * c45 - tall_z0 * s45, tall_y0, tall_x1 * s45 + tall_z0 * c45);
+	var tv0: float3 = float3(tall_x0 * c45 - tall_z0 * s45, tall_y0, tall_x0 * s45 + tall_z0 * c45);
+	
+	t = ray_triangle_intersect(ray_origin, ray_dir, tv7, tv6, tv2);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 1.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, tv7, tv2, tv3);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 1.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, tv4, tv5, tv1);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 1.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, tv4, tv1, tv0);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 1.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, tv3, tv2, tv5);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 1.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, tv3, tv5, tv4);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 1.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, tv1, tv5, tv6);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 1.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, tv1, tv6, tv7);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 1.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, tv0, tv7, tv3);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 1.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, tv0, tv3, tv4);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 1.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, tv6, tv5, tv4);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 1.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, tv6, tv4, tv7);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 1.0; }
+	}
+	
+	var short_cx: float = 1.0;
+	var short_cy: float = -2.15;
+	var short_cz: float = -0.5;
+	var short_half: float = 0.5;
+	var short_h: float = 0.7;
+	var short_x0: float = short_cx - short_half;
+	var short_x1: float = short_cx + short_half;
+	var short_z0: float = short_cz - short_half;
+	var short_z1: float = short_cz + short_half;
+	var short_y0: float = short_cy - short_h * 0.5;
+	var short_y1: float = short_cy + short_h * 0.5;
+	
+	var sv7: float3 = float3(short_x0 * c45 + short_z1 * s45, short_y0, -short_x0 * s45 + short_z1 * c45);
+	var sv6: float3 = float3(short_x1 * c45 + short_z1 * s45, short_y0, -short_x1 * s45 + short_z1 * c45);
+	var sv2: float3 = float3(short_x1 * c45 + short_z1 * s45, short_y1, -short_x1 * s45 + short_z1 * c45);
+	var sv3: float3 = float3(short_x0 * c45 + short_z1 * s45, short_y1, -short_x0 * s45 + short_z1 * c45);
+	var sv4: float3 = float3(short_x0 * c45 + short_z0 * s45, short_y1, -short_x0 * s45 + short_z0 * c45);
+	var sv5: float3 = float3(short_x1 * c45 + short_z0 * s45, short_y1, -short_x1 * s45 + short_z0 * c45);
+	var sv1: float3 = float3(short_x1 * c45 + short_z0 * s45, short_y0, -short_x1 * s45 + short_z0 * c45);
+	var sv0: float3 = float3(short_x0 * c45 + short_z0 * s45, short_y0, -short_x0 * s45 + short_z0 * c45);
+	
+	t = ray_triangle_intersect(ray_origin, ray_dir, sv7, sv6, sv2);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 2.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, sv7, sv2, sv3);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 2.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, sv4, sv5, sv1);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 2.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, sv4, sv1, sv0);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 2.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, sv3, sv2, sv5);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 2.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, sv3, sv5, sv4);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 2.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, sv1, sv5, sv6);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 2.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, sv1, sv6, sv7);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 2.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, sv0, sv7, sv3);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 2.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, sv0, sv3, sv4);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 2.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, sv6, sv5, sv4);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 2.0; }
+	}
+	t = ray_triangle_intersect(ray_origin, ray_dir, sv6, sv4, sv7);
+	hit = t > 0.0;
+	if (hit) {
+		var closer: bool = t < closest_t;
+		if (closer) { closest_t = t; instance = 2.0; }
+	}
+	
+	return float2(closest_t, instance);
+}
+
+fun get_normal(instance: float): float3 {
+	if (instance > 0.5) {
+		if (instance < 1.5) { return float3(0.0, 1.0, 0.0); }
+	}
+	if (instance > 1.5) {
+		if (instance < 2.5) { return float3(0.0, 1.0, 0.0); }
+	}
+	if (instance > 2.5) {
+		if (instance < 3.5) { return float3(1.0, 0.0, 0.0); }
+	}
+	if (instance > 3.5) {
+		if (instance < 4.5) { return float3(-1.0, 0.0, 0.0); }
+	}
+	if (instance > 4.5) {
+		if (instance < 5.5) { return float3(0.0, 1.0, 0.0); }
+	}
+	if (instance > 5.5) {
+		if (instance < 6.5) { return float3(0.0, -1.0, 0.0); }
+	}
+	if (instance > 6.5) {
+		if (instance < 7.5) { return float3(0.0, -1.0, 0.0); }
+	}
+	return float3(0.0, 0.0, -1.0);
+}
+
+fun in_shadow(hit_point: float3, light_dir: float3): bool {
+	var closest_t: float = 100000.0;
+	
+	var wall_thick: float = 0.3;
+	var room_min: float = -2.5;
+	var room_max: float = 2.5;
+	
+	// Left wall - solid box
+	var left_min: float3 = float3(room_min - wall_thick, room_min - wall_thick, room_min - wall_thick);
+	var left_max: float3 = float3(room_min, room_max + wall_thick, room_max + wall_thick);
+	var t: float = ray_box_intersect(hit_point, light_dir, left_min, left_max);
+	var hit: bool = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	
+	// Right wall - solid box
+	var right_min: float3 = float3(room_max, room_min - wall_thick, room_min - wall_thick);
+	var right_max: float3 = float3(room_max + wall_thick, room_max + wall_thick, room_max + wall_thick);
+	t = ray_box_intersect(hit_point, light_dir, right_min, right_max);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	
+	// Back wall - solid box
+	var back_min: float3 = float3(room_min - wall_thick, room_min - wall_thick, room_min - wall_thick);
+	var back_max: float3 = float3(room_max + wall_thick, room_max + wall_thick, room_min);
+	t = ray_box_intersect(hit_point, light_dir, back_min, back_max);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	
+	// Floor - solid box
+	var floor_min: float3 = float3(room_min - wall_thick, room_min - wall_thick, room_min - wall_thick);
+	var floor_max: float3 = float3(room_max + wall_thick, room_min, room_max + wall_thick);
+	t = ray_box_intersect(hit_point, light_dir, floor_min, floor_max);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	
+	// Ceiling - solid box
+	var ceil_min: float3 = float3(room_min - wall_thick, room_max, room_min - wall_thick);
+	var ceil_max: float3 = float3(room_max + wall_thick, room_max + wall_thick, room_max + wall_thick);
+	t = ray_box_intersect(hit_point, light_dir, ceil_min, ceil_max);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	
+	var c45: float = 0.70710678;
+	var s45: float = 0.70710678;
+	var tall_cx: float = -1.0;
+	var tall_cy: float = -1.65;
+	var tall_cz: float = -0.3;
+	var tall_half: float = 0.5;
+	var tall_h: float = 1.7;
+	var tall_x0: float = tall_cx - tall_half;
+	var tall_x1: float = tall_cx + tall_half;
+	var tall_z0: float = tall_cz - tall_half;
+	var tall_z1: float = tall_cz + tall_half;
+	var tall_y0: float = tall_cy - tall_h * 0.5;
+	var tall_y1: float = tall_cy + tall_h * 0.5;
+	
+	var tv7: float3 = float3(tall_x0 * c45 - tall_z1 * s45, tall_y0, tall_x0 * s45 + tall_z1 * c45);
+	var tv6: float3 = float3(tall_x1 * c45 - tall_z1 * s45, tall_y0, tall_x1 * s45 + tall_z1 * c45);
+	var tv2: float3 = float3(tall_x1 * c45 - tall_z1 * s45, tall_y1, tall_x1 * s45 + tall_z1 * c45);
+	var tv3: float3 = float3(tall_x0 * c45 - tall_z1 * s45, tall_y1, tall_x0 * s45 + tall_z1 * c45);
+	var tv4: float3 = float3(tall_x0 * c45 - tall_z0 * s45, tall_y1, tall_x0 * s45 + tall_z0 * c45);
+	var tv5: float3 = float3(tall_x1 * c45 - tall_z0 * s45, tall_y1, tall_x1 * s45 + tall_z0 * c45);
+	var tv1: float3 = float3(tall_x1 * c45 - tall_z0 * s45, tall_y0, tall_x1 * s45 + tall_z0 * c45);
+	var tv0: float3 = float3(tall_x0 * c45 - tall_z0 * s45, tall_y0, tall_x0 * s45 + tall_z0 * c45);
+	
+	t = ray_triangle_intersect(hit_point, light_dir, tv7, tv6, tv2);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, tv7, tv2, tv3);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, tv4, tv5, tv1);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, tv4, tv1, tv0);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, tv3, tv2, tv5);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, tv3, tv5, tv4);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, tv1, tv5, tv6);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, tv1, tv6, tv7);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, tv0, tv7, tv3);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, tv0, tv3, tv4);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, tv6, tv5, tv4);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, tv6, tv4, tv7);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	
+	var short_cx: float = 1.0;
+	var short_cy: float = -2.15;
+	var short_cz: float = -0.5;
+	var short_half: float = 0.5;
+	var short_h: float = 0.7;
+	var short_x0: float = short_cx - short_half;
+	var short_x1: float = short_cx + short_half;
+	var short_z0: float = short_cz - short_half;
+	var short_z1: float = short_cz + short_half;
+	var short_y0: float = short_cy - short_h * 0.5;
+	var short_y1: float = short_cy + short_h * 0.5;
+	
+	var sv7: float3 = float3(short_x0 * c45 + short_z1 * s45, short_y0, -short_x0 * s45 + short_z1 * c45);
+	var sv6: float3 = float3(short_x1 * c45 + short_z1 * s45, short_y0, -short_x1 * s45 + short_z1 * c45);
+	var sv2: float3 = float3(short_x1 * c45 + short_z1 * s45, short_y1, -short_x1 * s45 + short_z1 * c45);
+	var sv3: float3 = float3(short_x0 * c45 + short_z1 * s45, short_y1, -short_x0 * s45 + short_z1 * c45);
+	var sv4: float3 = float3(short_x0 * c45 + short_z0 * s45, short_y1, -short_x0 * s45 + short_z0 * c45);
+	var sv5: float3 = float3(short_x1 * c45 + short_z0 * s45, short_y1, -short_x1 * s45 + short_z0 * c45);
+	var sv1: float3 = float3(short_x1 * c45 + short_z0 * s45, short_y0, -short_x1 * s45 + short_z0 * c45);
+	var sv0: float3 = float3(short_x0 * c45 + short_z0 * s45, short_y0, -short_x0 * s45 + short_z0 * c45);
+	
+	t = ray_triangle_intersect(hit_point, light_dir, sv7, sv6, sv2);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, sv7, sv2, sv3);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, sv4, sv5, sv1);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, sv4, sv1, sv0);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, sv3, sv2, sv5);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, sv3, sv5, sv4);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, sv1, sv5, sv6);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, sv1, sv6, sv7);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, sv0, sv7, sv3);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, sv0, sv3, sv4);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, sv6, sv5, sv4);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	t = ray_triangle_intersect(hit_point, light_dir, sv6, sv4, sv7);
+	hit = t > 0.0;
+	if (hit) {
+		if (t < closest_t) { closest_t = t; }
+	}
+	
+	var is_shadow: bool = closest_t < 10000.0;
+	return is_shadow;
 }
 
 #[compute, threads(16, 16, 1)]
 fun comp(): void {
 	var idx: uint2 = dispatch_thread_id().xy;
-	var screen_x: float = float(idx.x);
-	var screen_y: float = float(idx.y);
-	
 	var aspect: float = 800.0 / 600.0;
-	var fov: float = 1.0;
 	
-	var ray_x: float = (2.0 * screen_x / 800.0 - 1.0) * aspect * fov;
-	var ray_y: float = (1.0 - 2.0 * screen_y / 600.0) * fov;
+	var ray_x: float = (2.0 * float(idx.x) / 800.0 - 1.0) * aspect;
+	var ray_y: float = (1.0 - 2.0 * float(idx.y) / 600.0);
 	
 	var ray_origin: float3 = rc.camera.xyz;
 	var yaw: float = rc.camera.w;
 	var pitch: float = rc.light.w;
 	
-	var cos_yaw: float = cos(yaw);
-	var sin_yaw: float = sin(yaw);
-	var cos_pitch: float = cos(pitch);
-	var sin_pitch: float = sin(pitch);
+	var cy: float = cos(yaw);
+	var sy: float = sin(yaw);
+	var cp: float = cos(pitch);
+	var sp: float = sin(pitch);
 	
-	var forward_x: float = sin_yaw * cos_pitch;
-	var forward_y: float = sin_pitch;
-	var forward_z: float = cos_yaw * cos_pitch;
+	var forward: float3 = float3(sy * cp, sp, cy * cp);
+	var right: float3 = float3(cy, 0.0, -sy);
+	var up: float3 = float3(-sy * sp, cp, -cy * sp);
 	
-	var right_x: float = cos_yaw;
-	var right_y: float = 0.0;
-	var right_z: float = -sin_yaw;	
-	var up_x: float = -sin_yaw * sin_pitch;
-	var up_y: float = cos_pitch;
-	var up_z: float = -cos_yaw * sin_pitch;
+	var ray_dir: float3 = normalize(forward + ray_x * right + ray_y * up);
 	
-	var ray_dir: float3 = normalize(float3(
-		forward_x + ray_x * right_x + ray_y * up_x,
-		forward_y + ray_y * up_y,
-		forward_z + ray_x * right_z + ray_y * up_z
-	));
-	
-	var closest_t: float = 100000.0;
-	var instance: float = 0.0;
-	
-	var t: float = -1.0;
-	
-	var tall_v0: float3 = float3(-1.8, -2.5, -0.8);
-	var tall_v1: float3 = float3(-0.8, -2.5, -0.8);
-	var tall_v2: float3 = float3(-0.8, -0.8, -0.8);
-	var tall_v3: float3 = float3(-1.8, -0.8, -0.8);
-	var tall_v4: float3 = float3(-1.8, -2.5, 0.2);
-	var tall_v5: float3 = float3(-0.8, -2.5, 0.2);
-	var tall_v6: float3 = float3(-0.8, -0.8, 0.2);
-	var tall_v7: float3 = float3(-1.8, -0.8, 0.2);
-	
-	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v0, tall_v1, tall_v2);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v0, tall_v2, tall_v3);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v4, tall_v6, tall_v5);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v4, tall_v7, tall_v6);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v0, tall_v4, tall_v5);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v0, tall_v5, tall_v1);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v1, tall_v5, tall_v6);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v1, tall_v6, tall_v2);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v2, tall_v6, tall_v7);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v2, tall_v7, tall_v3);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v3, tall_v7, tall_v4);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, tall_v3, tall_v4, tall_v0);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 1.0; }
-	
-	var short_v0: float3 = float3(0.5, -2.5, -1.5);
-	var short_v1: float3 = float3(1.5, -2.5, -1.5);
-	var short_v2: float3 = float3(1.5, -1.8, -1.5);
-	var short_v3: float3 = float3(0.5, -1.8, -1.5);
-	var short_v4: float3 = float3(0.5, -2.5, -0.5);
-	var short_v5: float3 = float3(1.5, -2.5, -0.5);
-	var short_v6: float3 = float3(1.5, -1.8, -0.5);
-	var short_v7: float3 = float3(0.5, -1.8, -0.5);
-	
-	t = ray_triangle_intersect(ray_origin, ray_dir, short_v0, short_v1, short_v2);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, short_v0, short_v2, short_v3);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, short_v4, short_v6, short_v5);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, short_v4, short_v7, short_v6);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, short_v0, short_v4, short_v5);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, short_v0, short_v5, short_v1);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, short_v1, short_v5, short_v6);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, short_v1, short_v6, short_v2);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, short_v2, short_v6, short_v7);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, short_v2, short_v7, short_v3);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, short_v3, short_v7, short_v4);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, short_v3, short_v4, short_v0);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 2.0; }
-	
-	var wall_thick: float = 0.3;
-	
-	var left_v0: float3 = float3(-2.5 - wall_thick, -2.5, -2.5);
-	var left_v1: float3 = float3(-2.5 - wall_thick, 2.5, -2.5);
-	var left_v2: float3 = float3(-2.5 - wall_thick, 2.5, 2.5);
-	var left_v3: float3 = float3(-2.5 - wall_thick, -2.5, 2.5);
-	
-	t = ray_triangle_intersect(ray_origin, ray_dir, left_v0, left_v1, left_v2);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 3.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, left_v0, left_v2, left_v3);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 3.0; }
-	
-	var right_v0: float3 = float3(2.5, -2.5, -2.5);
-	var right_v1: float3 = float3(2.5, 2.5, -2.5);
-	var right_v2: float3 = float3(2.5, 2.5, 2.5);
-	var right_v3: float3 = float3(2.5, -2.5, 2.5);
-	
-	t = ray_triangle_intersect(ray_origin, ray_dir, right_v0, right_v1, right_v2);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 4.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, right_v0, right_v2, right_v3);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 4.0; }
-	
-	var floor_v0: float3 = float3(-2.5, -2.5 - wall_thick, -2.5);
-	var floor_v1: float3 = float3(2.5, -2.5 - wall_thick, -2.5);
-	var floor_v2: float3 = float3(2.5, -2.5 - wall_thick, 2.5);
-	var floor_v3: float3 = float3(-2.5, -2.5 - wall_thick, 2.5);
-	
-	t = ray_triangle_intersect(ray_origin, ray_dir, floor_v0, floor_v1, floor_v2);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 5.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, floor_v0, floor_v2, floor_v3);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 5.0; }
-	
-	var ceil_v0: float3 = float3(-2.5, 2.5 + wall_thick, -2.5);
-	var ceil_v1: float3 = float3(2.5, 2.5 + wall_thick, -2.5);
-	var ceil_v2: float3 = float3(2.5, 2.5 + wall_thick, 2.5);
-	var ceil_v3: float3 = float3(-2.5, 2.5 + wall_thick, 2.5);
-	
-	t = ray_triangle_intersect(ray_origin, ray_dir, ceil_v0, ceil_v1, ceil_v2);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 6.0; }
-	t = ray_triangle_intersect(ray_origin, ray_dir, ceil_v0, ceil_v2, ceil_v3);
-	if (t > 0.0 && t < closest_t) { closest_t = t; instance = 6.0; }
+	var result: float2 = trace_scene(ray_origin, ray_dir);
+	var closest_t: float = result.x;
+	var instance: float = result.y;
 	
 	var color: float3;
 	
 	if (instance < 0.5) {
-		var slope: float = ray_dir.y;
-		var t: float = saturate(slope * 5.0 + 0.5);
-		color = lerp(rc.sky_bottom.xyz, rc.sky_top.xyz, t);
+		color = float3(0.0, 0.0, 0.0);
+	}
+	else {
+		if (instance < 2.5) { color = float3(0.9, 0.9, 0.9); }
+		else {
+			if (instance < 3.5) { color = float3(0.9, 0.1, 0.1); }
+			else {
+				if (instance < 4.5) { color = float3(0.1, 0.9, 0.1); }
+				else {
+					if (instance < 5.5) { color = float3(0.8, 0.8, 0.8); }
+					else {
+						if (instance < 6.5) { color = float3(0.8, 0.8, 0.8); }
+						else {
+							if (instance < 7.5) { color = float3(3.0, 3.0, 3.0); }
+							else {
+								color = float3(0.8, 0.8, 0.8);
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 	
-	if (instance > 0.5 && instance < 1.5) {
-		color = float3(0.9, 0.9, 0.9);
-	}
-	
-	if (instance > 1.5 && instance < 2.5) {
-		color = float3(0.9, 0.9, 0.9);
-	}
-	
-	if (instance > 2.5 && instance < 3.5) {
-		color = float3(0.9, 0.1, 0.1);
-	}
-	
-	if (instance > 3.5 && instance < 4.5) {
-		color = float3(0.1, 0.9, 0.1);
-	}
-	
-	if (instance > 4.5 && instance < 5.5) {
-		color = float3(0.5, 0.5, 0.5);
-	}
-	
-	if (instance > 5.5) {
-		color = float3(0.9, 0.9, 0.9);
+	if (instance > 0.5) {
+		if (instance < 6.5) {
+			var LIGHT_POS: float3 = float3(1.5, 3.5, 1.5);
+			var normal: float3 = get_normal(instance);
+			var hit_point: float3 = ray_origin + ray_dir * closest_t;
+			var light_dir: float3 = normalize(LIGHT_POS - hit_point);
+			
+			var ndotl: float = dot(normal, light_dir);
+			var diffuse: float = ndotl;
+			if (diffuse < 0.0) { diffuse = 0.0; }
+			
+			var shadow_ray_origin: float3 = hit_point + normal * 0.001;
+			var is_shadowed: bool = in_shadow(shadow_ray_origin, light_dir);
+			
+			var lighting: float = 0.3;
+			if (!is_shadowed) {
+				lighting = 0.3 + diffuse * 1.5;
+			}
+			
+			color = color * lighting;
+		}
 	}
 	
 	render_target[idx] = float4(color, 1.0);
