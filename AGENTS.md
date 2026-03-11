@@ -1,6 +1,6 @@
 # AGENTS.md - Kore3 Game Engine
 
-**Generated:** 2026-03-10 | **Branch:** main
+**Generated:** 2026-03-11 | **Branch:** main
 
 ## OVERVIEW
 Cross-platform C game engine with multi-GPU support (Metal, Vulkan, OpenGL, Direct3D). Uses Kongruent shader language.
@@ -61,6 +61,63 @@ open build/build/Release/computeshader_test.app
 - g2 2D rendering: orthographic projection matrix for screen coords → NDC
   - kore_matrix3x3 is column-major: m[x*3+y] = column x, row y
   - 2D ortho matrix (screen 0,width × 0,height → NDC -1,1): m[0]=2/width, m[4]=2/height, m[2]=-1, m[5]=-1
+
+## UI DIALOGS
+- **Header:** `includes/kore3/ui.h`
+- **Test:** `tests/ui_test/`
+- **Build:** `./make -g metal --kore . --from tests/ui_test --compile`
+
+### API
+```c
+#include <kore3/ui.h>
+
+// Dialog types
+KORE_UI_DIALOG_OK        // OK only
+KORE_UI_DIALOG_OK_CANCEL // OK / Cancel
+KORE_UI_DIALOG_YES_NO    // Yes / No
+
+// Icon types
+KORE_UI_DIALOG_INFO     // Information
+KORE_UI_DIALOG_ERROR   // Error
+KORE_UI_DIALOG_WARNING // Warning
+KORE_UI_DIALOG_QUESTION // Question
+
+// Show dialog - returns 1 for OK/Yes, 0 for Cancel/No
+int kore_ui_dialog(const char *title, const char *message, int dialog_type, int icon);
+
+// File chooser
+typedef struct kore_ui_file_chooser_options {
+    const char *title;
+    const char *initial_directory;
+    const char *file_name;
+    const char **filters;   // e.g. {"Images", "png"}
+    int filter_count;
+    bool for_save;          // true = save dialog, false = open
+    int window_id;         // parent window (0 for none)
+} kore_ui_file_chooser_options;
+
+#define KORE_UI_FILE_CHOOSER_OK     0
+#define KORE_UI_FILE_CHOOSER_CANCEL 1
+
+int kore_ui_file_chooser(kore_ui_file_chooser_options *options, char *buffer, int buffer_size);
+
+// Clipboard
+bool kore_ui_clipboard_set_text(const char *text);
+char *kore_ui_clipboard_get_text(void);  // Caller must free() returned string
+```
+
+### Platform Support
+| Feature | Windows | macOS | Linux |
+|---------|---------|-------|-------|
+| Dialog | ✅ | ✅ | ✅ |
+| File Chooser | ✅ | ✅ | ✅ |
+| Clipboard | ✅ | ✅ | ✅ |
+
+### Implementation
+- **Windows:** `backends/system/windows/sources/system.c` (MessageBoxW, GetOpenFileNameW)
+- **macOS:** `backends/system/macos/sources/uiunit.m` (NSAlert, NSOpenPanel, NSPasteboard)
+- **Linux:** `backends/system/linux/sources/ui.c` (GTK dialogs)
+- **Other:** `sources/root/ui.c` (stub, logs warning)
 
 ## iOS DEVELOPMENT
 - **Build:** `./make -t ios -g metal --kore . --from <test> --compile --nosigning`

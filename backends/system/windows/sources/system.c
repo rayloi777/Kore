@@ -1466,3 +1466,152 @@ int kore_hardware_threads(void) {
 	GetSystemInfo(&sysinfo);
 	return sysinfo.dwNumberOfProcessors;
 }
+
+#include <kore3/ui.h>
+
+static UINT win_dlg_type(int dialog_type) {
+	switch (dialog_type) {
+		case KORE_UI_DIALOG_OK_CANCEL:
+			return MB_OKCANCEL;
+		case KORE_UI_DIALOG_YES_NO:
+			return MB_YESNO;
+		default:
+			return MB_OK;
+	}
+}
+
+static UINT win_dlg_icon(int icon) {
+	switch (icon) {
+		case KORE_UI_DIALOG_ERROR:
+			return MB_ICONERROR;
+		case KORE_UI_DIALOG_WARNING:
+			return MB_ICONWARNING;
+		case KORE_UI_DIALOG_QUESTION:
+			return MB_ICONQUESTION;
+		default:
+			return MB_ICONINFORMATION;
+	}
+}
+
+int kore_ui_dialog(const char *title, const char *message, int dialog_type, int icon) {
+	wchar_t wtitle[512];
+	wchar_t wmessage[4096];
+	MultiByteToWideChar(CP_UTF8, 0, title, -1, wtitle, 512);
+	MultiByteToWideChar(CP_UTF8, 0, message, -1, wmessage, 4096);
+	UINT flags = win_dlg_type(dialog_type) | win_dlg_icon(icon);
+	int ret = MessageBoxW(NULL, wmessage, wtitle, flags);
+	if (ret == IDYES || ret == IDOK)
+		return 1;
+	return 0;
+}
+
+static void to_wide_string(const char *src, wchar_t *dst, int dst_size) {
+	MultiByteToWideChar(CP_UTF8, 0, src, -1, dst, dst_size);
+}
+
+static void from_wide_string(const wchar_t *src, char *dst, int dst_size) {
+	WideCharToMultiByte(CP_UTF8, 0, src, -1, dst, dst_size, NULL, NULL);
+}
+
+int kore_ui_file_chooser(kore_ui_file_chooser_options *options, char *buffer, int buffer_size) {
+	OPENFILENAMEW ofn;
+	wchar_t file_name[1024] = {0};
+	wchar_t initial_dir[1024] = {0};
+	wchar_t title[512] = {0};
+	wchar_t filter_str[2048] = {0};
+
+	if (options->file_name != NULL) {
+		to_wide_string(options->file_name, file_name, 1024);
+	}
+	if (options->initial_directory != NULL) {
+		to_wide_string(options->initial_directory, initial_dir, 1024);
+	}
+	if (options->title != NULL) {
+		to_wide_string(options->title, title, 512);
+	}
+
+	if (options->filters != NULL && options->filter_count > 0) {
+		int pos = 0;
+		for (int i = 0; i < options->filter_count; i++) {
+			const char *filter = options->filters[i];
+			int len = (int)strlen(filter);
+			if (pos + len + 1 >= 2048) break;
+			to_wide_string(filter, &filter_str[pos], 2048 - pos);
+			pos += len + 1;
+		}
+		filter_str[pos] = 0;
+	}
+
+	memset(&ofn, 0, sizeof(ofn));
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hwndOwner = NULL;
+	ofn.lpstrFile = file_name;
+	ofn.nMaxFile = 1024;
+	ofn.lpstrInitialDir = initial_dir[0] ? initial_dir : NULL;
+	ofn.lpstrTitle = title[0] ? title : NULL;
+	ofn.lpstrFilter = filter_str[0] ? filter_str : NULL;
+	ofn.nFilterIndex = 1;
+	ofn.Flags = OFN_NOCHANGEDIR | OFN_PATHMUSTEXIST;
+
+	BOOL result;
+	if (options->for_save) {
+		result = GetSaveFileNameW(&ofn);
+	} else {
+		result = GetOpenFileNameW(&ofn);
+	}
+
+	if (result && buffer != NULL && buffer_size > 0) {
+		from_wide_string(file_name, buffer, buffer_size);
+		return KORE_UI_FILE_CHOOSER_OK;
+	}
+	return KORE_UI_FILE_CHOOSER_CANCEL;
+}
+
+bool kore_ui_clipboard_set_text(const char *text) {
+	wchar_t wtext[4096];
+	MultiByteToWideChar(CP_UTF8, 0, text, -1, wtext, 4096);
+	if (!OpenClipboard(NULL)) return false;
+	if (!EmptyClipboard()) {
+		CloseClipboard();
+		return false;
+	}
+	size_t size = (wcslen(wtext) + 1) * sizeof(wchar_t);
+	HANDLE handle = GlobalAlloc(GMEM_MOVEABLE, size);
+	if (handle == NULL) {
+		CloseClipboard();
+		return false;
+	}
+	void *data = GlobalLock(handle);
+	if (data == NULL) {
+		GlobalFree(handle);
+		CloseClipboard();
+		return false;
+	}
+	memcpy(data, wtext, size);
+	GlobalUnlock(handle);
+	SetClipboardData(CF_UNICODETEXT, handle);
+	CloseClipboard();
+	return true;
+}
+
+char *kore_ui_clipboard_get_text(void) {
+	if (!OpenClipboard(NULL)) return NULL;
+	HANDLE handle = GetClipboardData(CF_UNICODETEXT);
+	if (handle == NULL) {
+		CloseClipboard();
+		return NULL;
+	}
+	wchar_t *wtext = (wchar_t *)GlobalLock(handle);
+	if (wtext == NULL) {
+		CloseClipboard();
+		return NULL;
+	}
+	int len = (int)wcslen(wtext);
+	char *result = (char *)malloc(len + 1);
+	if (result != NULL) {
+		WideCharToMultiByte(CP_UTF8, 0, wtext, -1, result, len + 1, NULL, NULL);
+	}
+	GlobalUnlock(handle);
+	CloseClipboard();
+	return result;
+}
