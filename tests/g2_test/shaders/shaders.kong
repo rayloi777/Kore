@@ -32,9 +32,9 @@ const tex: tex2d;
 const sam: sampler;
 
 fun pix(input: vertex_out): float4 {
-    var alpha: float = sample(tex, sam, input.uv).r;
-    // Simple alpha test - just use texture alpha
-    return float4(input.color.rgb, alpha);
+    var tc: float4 = sample(tex, sam, float2(input.uv.x, input.uv.y));
+    var alpha: float = tc.r;
+    return float4(input.color.rgb, alpha * input.color.a);
 }
 
 #[pipe]
@@ -42,4 +42,6 @@ struct pipeline {
     vertex = pos;
     fragment = pix;
     format = framebuffer_format();
+    blend_source = blend_source_alpha;
+    blend_destination = blend_destination_inv_source_alpha;
 }
