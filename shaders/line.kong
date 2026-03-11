@@ -1,0 +1,30 @@
+
+#[set(everything)]
+const line_constants: {
+	vp: float4x4;
+	color: float3;
+};
+
+struct line_vert_in {
+	pos: float3;
+}
+
+struct line_vert_out {
+	pos: float4;
+}
+
+fun line_vert(input: line_vert_in): line_vert_out {
+	var output: line_vert_out;
+	output.pos = line_constants.vp * float4(input.pos, 1.0);
+	return output;
+}
+
+fun line_frag(input: line_vert_out): float4 {
+	return float4(line_constants.color, 1.0);
+}
+
+#[pipe]
+struct pipe {
+	vertex = line_vert;
+	fragment = line_frag;
+}

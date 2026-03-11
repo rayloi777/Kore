@@ -549,7 +549,6 @@ void kore_metal_command_list_draw_indirect(kore_gpu_command_list *list, kore_gpu
 	
 	if (render_command_encoder != nil && metal_indirect_buffer != nil) {
 		if (count_buffer != NULL) {
-			id<MTLBuffer> metal_count_buffer = (__bridge id<MTLBuffer>)count_buffer->metal.buffer;
 			[render_command_encoder drawPrimitives:MTLPrimitiveTypeTriangle
 			                        vertexStart:0
 			                        vertexCount:3

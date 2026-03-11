@@ -1,4 +1,4 @@
-let project = new Project('Text Render Test');
+let project = new Project('Draw Test');
 
 await project.addProject(findKore());
 

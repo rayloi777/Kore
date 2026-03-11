@@ -20,9 +20,7 @@ static int basic_glyphs[] = {
     48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
     64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79,
     80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95,
-    96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111,
-    112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126,
-    0x4E2D, 0x6587, 0x4F60, 0x597D, 0x4E16, 0x754C, 0x0
+    96, 97, 98, 99,
 };
 
 static void update(void *data) {
@@ -49,15 +47,15 @@ static void update(void *data) {
     kore_gpu_command_list_begin_render_pass(&list, &parameters);
     
     if (font) {
-        draw_string(font, "Hello World!", 50.0f, 100.0f, 1.0f, 0.0f, 0.0f, 1.0f);
-        draw_string(font, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", 50.0f, 150.0f, 0.0f, 1.0f, 0.0f, 1.0f);
-        draw_string(font, "abcdefghijklmnopqrstuvwxyz", 50.0f, 200.0f, 0.0f, 0.0f, 1.0f, 1.0f);
-        draw_string(font, "0123456789", 50.0f, 250.0f, 1.0f, 1.0f, 0.0f, 1.0f);
+        draw_string(font, "Hello World!", 50.0f, 100.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+        draw_string(font, "ABC", 50.0f, 150.0f, 1.0f, 0.0f, 0.0f, 1.0f);
+        draw_string(font, "abc", 50.0f, 200.0f, 0.0f, 1.0f, 0.0f, 1.0f);
+        draw_string(font, "0123", 50.0f, 250.0f, 1.0f, 1.0f, 0.0f, 1.0f);
         
         float w = draw_string_width(font, "Hello World!");
         char buf[64];
         snprintf(buf, sizeof(buf), "Width: %.1f", w);
-        draw_string(font, buf, 50.0f, 300.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+        draw_string(font, buf, 50.0f, 300.0f, 1.0f, 0.5f, 0.0f, 1.0f);
     }
     
     kore_gpu_command_list_end_render_pass(&list);
@@ -66,7 +64,7 @@ static void update(void *data) {
 }
 
 int kickstart(int argc, char **argv) {
-    kore_init("Text Render Test", width, height, NULL, NULL);
+    kore_init("Draw Test", width, height, NULL, NULL);
     kore_set_update_callback(update, NULL);
 
     kore_gpu_device_wishlist wishlist = {0};
@@ -76,9 +74,12 @@ int kickstart(int argc, char **argv) {
 
     kore_gpu_device_create_command_list(&device, KORE_GPU_COMMAND_LIST_TYPE_GRAPHICS, &list);
     
-    draw_init(&device);
+    draw_init(&device, &list);
     
-    font = draw_font_create("deployment/NotoSansTC-Regular.ttf", basic_glyphs, sizeof(basic_glyphs) / sizeof(basic_glyphs[0]), 24.0f);
+    kore_gpu_texture *fb = kore_gpu_device_get_framebuffer(&device);
+    draw_set_viewport(fb->width, fb->height);
+    
+    font = draw_font_create("NotoSansTC-Regular.ttf", basic_glyphs, sizeof(basic_glyphs) / sizeof(basic_glyphs[0]), 16.0f);
     
     if (font) {
         kore_log(KORE_LOG_LEVEL_INFO, "Font loaded successfully");

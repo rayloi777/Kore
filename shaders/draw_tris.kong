@@ -1,0 +1,35 @@
+
+#[set(everything)]
+const tris_constants: {
+	pos: float4;
+	col: float4;
+};
+
+struct tris_vert_in {
+	pos: float2;
+}
+
+struct tris_vert_out {
+	pos: float4;
+	col: float4;
+}
+
+fun draw_tris_vert(input: tris_vert_in): tris_vert_out {
+	var output: tris_vert_out;
+	output.pos = float4(input.pos.x, input.pos.y, 0.0, 1.0);
+	output.pos.xy = output.pos.xy * tris_constants.pos.zw + tris_constants.pos.xy;
+	output.pos.xy = output.pos.xy * 2.0 - 1.0;
+	output.pos.y = -output.pos.y;
+	output.col = tris_constants.col;
+	return output;
+}
+
+fun draw_tris_frag(input: tris_vert_out): float4 {
+	return input.col;
+}
+
+#[pipe]
+struct pipe {
+	vertex = draw_tris_vert;
+	fragment = draw_tris_frag;
+}

@@ -1,0 +1,53 @@
+struct vertex_in {
+    pos: float3;
+    uv: float2;
+}
+
+struct vertex_out {
+    pos: float4;
+    uv: float2;
+}
+
+#[set(everything)]
+const constants: {
+    mvp: float4x4;
+};
+
+#[set(everything)]
+const tex: tex2d;
+
+#[set(everything)]
+const sam: sampler;
+
+#[vertex]
+fun pos_shader(input: vertex_in): vertex_out {
+    var out: vertex_out;
+    
+    var position: float4;
+    position.xyz = input.pos;
+    position.w = 1.0;
+    
+    out.pos = constants.mvp * position;
+    out.uv = input.uv;
+    
+    return out;
+}
+
+#[fragment]
+fun pix(input: vertex_out): float4 {
+    var color: float4 = sample(tex, sam, input.uv);
+    return float4(color.r, color.r, color.r, color.r);
+}
+
+#[pipe]
+struct text_pipeline {
+    vertex = pos_shader;
+    fragment = pix;
+    format = framebuffer_format();
+    blend_source = BLEND_FACTOR_SRC_ALPHA;
+    blend_destination = BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    blend_operation = BLEND_OPERATION_ADD;
+    alpha_blend_source = BLEND_FACTOR_SRC_ALPHA;
+    alpha_blend_destination = BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    alpha_blend_operation = BLEND_OPERATION_ADD;
+}

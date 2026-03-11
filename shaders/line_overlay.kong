@@ -1,0 +1,30 @@
+
+#[set(everything)]
+const line_overlay_constants: {
+	vp: float4x4;
+	color: float3;
+};
+
+struct vert_in {
+	pos: float3;
+}
+
+struct vert_out {
+	pos: float4;
+}
+
+fun line_overlay_vert(input: vert_in): vert_out {
+	var output: vert_out;
+	output.pos = line_overlay_constants.vp * float4(input.pos, 1.0);
+	return output;
+}
+
+fun line_overlay_frag(input: vert_out): float4 {
+	return float4(line_overlay_constants.color, 1.0);
+}
+
+#[pipe]
+struct pipe {
+	vertex = line_overlay_vert;
+	fragment = line_overlay_frag;
+}

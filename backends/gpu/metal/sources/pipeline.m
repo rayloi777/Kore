@@ -402,9 +402,9 @@ void kore_metal_render_pipeline_init(kore_metal_device *device, kore_metal_rende
 		pipe->depth_stencil_state = (__bridge_retained void *)[metal_device newDepthStencilStateWithDescriptor:depth_stencil_descriptor];
 	}
 
-	pipe->primitive_type = convert_primitive_topology(parameters->primitive.topology);
-	pipe->cull_mode = convert_cull_mode(parameters->primitive.cull_mode);
-	pipe->front_face_winding = convert_front_face(parameters->primitive.front_face);
+	pipe->primitive_type = (uint32_t)convert_primitive_topology(parameters->primitive.topology);
+	pipe->cull_mode = (uint32_t)convert_cull_mode(parameters->primitive.cull_mode);
+	pipe->front_face_winding = (uint32_t)convert_front_face(parameters->primitive.front_face);
 }
 
 void kore_metal_render_pipeline_destroy(kore_metal_render_pipeline *pipe) {
