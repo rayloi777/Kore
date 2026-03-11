@@ -48,6 +48,14 @@ static everything_set g_descriptor_set;
 
 static int g_vertex_count = 0;
 static int g_index_count = 0;
+static int g_frame_index = 0;
+
+enum {
+    G2_PIPELINE_IMAGE,
+    G2_PIPELINE_TEXT,
+};
+
+static int g_current_pipeline = G2_PIPELINE_IMAGE;
 
 static kore_g2_font *g_font = NULL;
 static float g_font_size = 16.0f;
@@ -178,9 +186,13 @@ void kore_g2_flush(void) {
 	constants_data->mvp = mvp;
 	constants_type_buffer_unlock(&g_constants);
 	
-	kong_set_render_pipeline_pipeline(g_command_list);
+	if (g_current_pipeline == G2_PIPELINE_TEXT) {
+		kong_set_render_pipeline_text_pipeline(g_command_list);
+	} else {
+		kong_set_render_pipeline_pipeline(g_command_list);
+	}
 	
-		kong_set_descriptor_set_everything(g_command_list, &g_descriptor_set);
+	kong_set_descriptor_set_everything(g_command_list, &g_descriptor_set, g_frame_index % KORE_GPU_MAX_FRAMEBUFFERS);
 	
 	kong_set_vertex_buffer_vertex_in(g_command_list, &g_vertices);
 	
@@ -193,6 +205,7 @@ void kore_g2_flush(void) {
 }
 
 void kore_g2_end(void) {
+	g_frame_index++;
 }
 
 void kore_g2_clear(float r, float g, float b, float a) {
@@ -215,6 +228,8 @@ void kore_g2_draw_scaled_image(kore_gpu_texture *texture, float dx, float dy, fl
 	if (texture == NULL || g_command_list == NULL) {
 		return;
 	}
+	
+	g_current_pipeline = G2_PIPELINE_IMAGE;
 	
 	if (g_vertex_count + 4 > MAX_VERTICES) {
 		kore_g2_flush();
@@ -264,6 +279,8 @@ void kore_g2_draw_sub_image(kore_gpu_texture *texture, float x, float y, float s
 	if (texture == NULL || g_command_list == NULL) {
 		return;
 	}
+	
+	g_current_pipeline = G2_PIPELINE_IMAGE;
 	
 	float tex_w = (float)texture->width;
 	float tex_h = (float)texture->height;
@@ -321,6 +338,8 @@ void kore_g2_draw_scaled_sub_image(kore_gpu_texture *texture, float sx, float sy
 	if (texture == NULL || g_command_list == NULL) {
 		return;
 	}
+	
+	g_current_pipeline = G2_PIPELINE_IMAGE;
 	
 	float tex_w = (float)texture->width;
 	float tex_h = (float)texture->height;
@@ -400,6 +419,8 @@ void kore_g2_draw_string(const char *utf8_text, float x, float y) {
 	if (utf8_text == NULL || g_font == NULL || g_command_list == NULL) {
 		return;
 	}
+	
+	g_current_pipeline = G2_PIPELINE_TEXT;
 	
 	kore_gpu_texture *font_tex = kore_g2_font_get_texture(g_font);
 	if (font_tex == NULL) {
