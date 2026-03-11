@@ -150,6 +150,10 @@ void kore_g2_init(kore_gpu_device *device, int screen_width, int screen_height) 
 }
 
 void kore_g2_begin(kore_gpu_command_list *list) {
+	if (g_font && g_font->deferred_mode && g_font->rebuild_needed) {
+		kore_g2_font_rebuild(g_font, g_device);
+	}
+	
 	g_command_list = list;
 	g_vertex_count = 0;
 }
@@ -409,10 +413,12 @@ void kore_g2_draw_string(const char *utf8_text, float x, float y) {
 	while (*p) {
 		uint32_t codepoint = utf8_decode(&p);
 		
+		if (g_font->dynamic_mode) {
+			kore_g2_font_ensure_codepoint(g_font, g_device, codepoint);
+		}
+		
 		kore_g2_font_aligned_quad quad;
 		if (kore_g2_font_get_baked_quad(g_font, codepoint, &xpos, &ypos, &quad)) {
-			printf("Draw glyph: codepoint=%d (0x%x), quad: x0=%.1f y0=%.1f x1=%.1f y1=%.1f s0=%.3f t0=%.3f s1=%.3f t1=%.3f\n", 
-				codepoint, codepoint, quad.x0, quad.y0, quad.x1, quad.y1, quad.s0, quad.t0, quad.s1, quad.t1);
 			if (g_vertex_count + 4 > MAX_VERTICES) {
 				kore_g2_flush();
 			}
@@ -456,6 +462,11 @@ void kore_g2_draw_string(const char *utf8_text, float x, float y) {
 			g_vertex_count += 4;
 			g_index_count += 6;
 		}
+	}
+	
+	if (g_font->dynamic_mode && g_font->pending_count > 0) {
+		// Defer flush - will be done at start of next frame
+		// kore_g2_font_flush_with_command_list(g_font, g_device, g_command_list);
 	}
 }
 

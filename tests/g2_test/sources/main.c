@@ -9,6 +9,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 static const int width  = 800;
 static const int height = 600;
@@ -21,6 +22,7 @@ static kore_g2_font           font;
 static bool                   font_loaded = false;
 
 static uint64_t update_index = 0;
+static int frame_count = 0;
 
 static void update(void *data) {
     (void)data;
@@ -57,13 +59,49 @@ static void update(void *data) {
     kore_g2_draw_scaled_image(&white_texture, 50.0f, 200.0f, 60.0f, 60.0f);
     
     if (font_loaded) {
-        printf("Drawing text...\n");
         kore_g2_set_font(&font);
+        
+        // Test with simple ASCII first
+        kore_g2_set_font_size(24.0f);
+        kore_g2_set_color(1.0f, 0.0f, 0.0f, 1.0f);
+        kore_g2_draw_string("ABC", 50.0f, 50.0f);
+        
+        kore_g2_set_color(0.0f, 1.0f, 0.0f, 1.0f);
+        kore_g2_draw_string("DEF", 150.0f, 50.0f);
+        
+        kore_g2_set_font_size(36.0f);
+        kore_g2_set_color(0.2f, 0.9f, 0.4f, 1.0f);
+        kore_g2_draw_string("你好世界！", 50.0f, 150.0f);
+        
+        kore_g2_set_font_size(28.0f);
+        kore_g2_set_color(0.9f, 0.3f, 0.5f, 1.0f);
+        kore_g2_draw_string("日本語テスト", 50.0f, 200.0f);
+        
+        kore_g2_set_font_size(28.0f);
+        kore_g2_set_color(0.3f, 0.6f, 1.0f, 1.0f);
+        kore_g2_draw_string("한국어 테스트", 50.0f, 250.0f);
+        
         kore_g2_set_font_size(24.0f);
         kore_g2_set_color(1.0f, 1.0f, 1.0f, 1.0f);
-        kore_g2_draw_string("Hello World", 300.0f, 100.0f);
-        kore_g2_draw_string("你好世界", 300.0f, 150.0f);
-        printf("Text draw called\n");
+        kore_g2_draw_string("Alpha: αβγδε", 50.0f, 300.0f);
+        kore_g2_draw_string("Math: ∑∏∫√∞", 50.0f, 330.0f);
+        
+        kore_g2_set_font_size(20.0f);
+        kore_g2_set_color(0.7f, 0.7f, 0.7f, 1.0f);
+        kore_g2_draw_string("(All text rendered dynamically)", 50.0f, 380.0f);
+        
+        int total, hits, misses, evictions;
+        kore_g2_font_get_stats(&font, &total, &hits, &misses, &evictions);
+        
+        char stats[256];
+        snprintf(stats, sizeof(stats), "Cache: hits=%d misses=%d evictions=%d", hits, misses, evictions);
+        kore_g2_draw_string(stats, 50.0f, 550.0f);
+        
+        frame_count++;
+        if (frame_count % 60 == 0) {
+            printf("[g2_test] Frame %d - Cache stats: total=%d hits=%d misses=%d evictions=%d\n", 
+                   frame_count, total, hits, misses, evictions);
+        }
     } else {
         printf("Font not loaded, skipping text\n");
     }
@@ -79,7 +117,7 @@ static void update(void *data) {
 }
 
 int kickstart(int argc, char **argv) {
-    kore_init("g2 Text Test", width, height, NULL, NULL);
+    kore_init("g2 Dynamic Text Test", width, height, NULL, NULL);
     kore_set_update_callback(update, NULL);
 
     kore_gpu_device_wishlist wishlist = {0};
@@ -134,14 +172,18 @@ int kickstart(int argc, char **argv) {
     
     kore_gpu_texture_view_create(&device, &white_texture, &white_texture_view);
 
-    int ascii_glyphs[128];
-    for (int i = 0; i < 128; i++) ascii_glyphs[i] = i;
-    int chinese_glyphs[] = {0x4F60, 0x597D, 0x4E16, 0x754C};
-    int all_glyphs[132];
-    for (int i = 0; i < 128; i++) all_glyphs[i] = ascii_glyphs[i];
-    for (int i = 0; i < 4; i++) all_glyphs[128 + i] = chinese_glyphs[i];
-    font_loaded = kore_g2_font_init_with_glyphs(&font, &device, "NotoSansTC-Regular.ttf", 24.0f, all_glyphs, 132);
-    printf("Font loaded: %d\n", font_loaded);
+    const int *glyphs;
+    int glyph_count;
+    glyphs = kore_g2_font_get_traditional_chinese_glyphs(&glyph_count);
+    
+    font_loaded = kore_g2_font_init_with_glyphs(&font, &device, "jf-openhuninn.ttf", 24.0f, glyphs, glyph_count);
+    
+    if (font_loaded) {
+        // Simple mode - no dynamic/deferred
+        printf("[g2_test] Font loaded with %d glyphs\n", glyph_count);
+    } else {
+        printf("[g2_test] Font load failed\n");
+    }
 
     kore_start();
 

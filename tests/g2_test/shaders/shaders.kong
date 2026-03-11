@@ -32,11 +32,9 @@ const tex: tex2d;
 const sam: sampler;
 
 fun pix(input: vertex_out): float4 {
-    var tc: float4 = sample(tex, sam, input.uv);
-    var alpha: float = tc.r;
-    var out_col: float4 = float4(input.color.rgb, input.color.a * alpha);
-    out_col.rgb *= out_col.a;
-    return out_col;
+    var alpha: float = sample(tex, sam, input.uv).r;
+    // Simple alpha test - just use texture alpha
+    return float4(input.color.rgb, alpha);
 }
 
 #[pipe]

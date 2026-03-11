@@ -33,7 +33,8 @@ const sam: sampler;
 
 fun pix(input: vertex_out): float4 {
     var tc: float4 = sample(tex, sam, float2(input.uv.x, input.uv.y));
-    return float4(tc.r * input.color.r, tc.g * input.color.g, tc.b * input.color.b, tc.a * input.color.a);
+    float alpha = tc.r;
+    return float4(input.color.rgb, alpha * input.color.a);
 }
 
 #[pipe]
@@ -41,4 +42,6 @@ struct pipeline {
     vertex = pos;
     fragment = pix;
     format = framebuffer_format();
+    blend_source = blend_source_alpha;
+    blend_destination = blend_destination_inv_source_alpha;
 }
