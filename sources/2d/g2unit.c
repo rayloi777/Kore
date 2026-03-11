@@ -192,7 +192,7 @@ void kore_g2_flush(void) {
 		kong_set_render_pipeline_pipeline(g_command_list);
 	}
 	
-	kong_set_descriptor_set_everything(g_command_list, &g_descriptor_set, g_frame_index % KORE_GPU_MAX_FRAMEBUFFERS);
+	kong_set_descriptor_set_everything(g_command_list, &g_descriptor_set);
 	
 	kong_set_vertex_buffer_vertex_in(g_command_list, &g_vertices);
 	

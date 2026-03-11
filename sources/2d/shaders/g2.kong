@@ -48,8 +48,6 @@ struct pipeline {
     vertex = pos;
     fragment = pix;
     format = framebuffer_format();
-    blend_source = blend_source_alpha;
-    blend_destination = blend_destination_inv_source_alpha;
 }
 
 #[pipe]
@@ -57,6 +55,4 @@ struct text_pipeline {
     vertex = pos;
     fragment = text_pix;
     format = framebuffer_format();
-    blend_source = BLEND_ONE;
-    blend_destination = BLEND_INV_SOURCE_ALPHA;
 }

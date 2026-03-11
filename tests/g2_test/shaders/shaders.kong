@@ -10,10 +10,16 @@ struct vertex_out {
     color: float4;
 }
 
-#[set(everything), indexed]
+#[set(everything)]
 const constants: {
     mvp: float3x3;
 };
+
+#[set(everything)]
+const tex: tex2d;
+
+#[set(everything)]
+const sam: sampler;
 
 fun pos(input: vertex_in): vertex_out {
     var out: vertex_out;
@@ -25,11 +31,15 @@ fun pos(input: vertex_in): vertex_out {
     return out;
 }
 
-#[set(everything)]
-const tex: tex2d;
+fun pos_text(input: vertex_in): vertex_out {
+    var out: vertex_out;
+    
+    out.pos = float4(constants.mvp * float3(input.pos.x, input.pos.y, 1.0), 1.0);
+    out.uv = input.uv;
+    out.color = input.color;
 
-#[set(everything)]
-const sam: sampler;
+    return out;
+}
 
 fun pix(input: vertex_out): float4 {
     var tc: float4 = sample(tex, sam, float2(input.uv.x, input.uv.y));
@@ -48,15 +58,11 @@ struct pipeline {
     vertex = pos;
     fragment = pix;
     format = framebuffer_format();
-    blend_source = blend_source_alpha;
-    blend_destination = blend_destination_inv_source_alpha;
 }
 
 #[pipe]
 struct text_pipeline {
-    vertex = pos;
+    vertex = pos_text;
     fragment = text_pix;
     format = framebuffer_format();
-    blend_source = BLEND_ONE;
-    blend_destination = BLEND_INV_SOURCE_ALPHA;
 }
