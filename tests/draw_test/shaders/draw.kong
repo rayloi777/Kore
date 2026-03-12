@@ -36,8 +36,8 @@ fun pos_shader(input: vertex_in): vertex_out {
 
 #[fragment]
 fun pix(input: vertex_out): float4 {
-    // 测试：纯蓝色，不使用纹理
-    return float4(0.0, 0.0, 1.0, 1.0);
+    var tex_color: float4 = sample(tex, sam, input.uv);
+    return float4(constants.color.rgb * tex_color.r, tex_color.r);
 }
 
 #[pipe]

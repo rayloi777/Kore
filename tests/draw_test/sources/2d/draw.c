@@ -183,8 +183,20 @@ draw_font *draw_font_create(const char *ttf_path, int *glyphs, int glyph_count, 
         
         if (y + h >= ph) {
             if (bitmap) stbtt_FreeBitmap(bitmap, NULL);
+            font->glyphs[i].codepoint = codepoint;
+            font->glyphs[i].x = x;
+            font->glyphs[i].y = y;
             font->glyphs[i].width = 0;
             font->glyphs[i].height = 0;
+            font->glyphs[i].xoffset = (float)xoff;
+            font->glyphs[i].yoffset = (float)yoff;
+            int advance;
+            stbtt_GetCodepointHMetrics(&font->font_info, codepoint, &advance, NULL);
+            font->glyphs[i].xadvance = (float)advance * font->scale;
+            font->glyphs[i].s0 = (float)x / (float)pw;
+            font->glyphs[i].t0 = (float)y / (float)ph;
+            font->glyphs[i].s1 = (float)(x + w) / (float)pw;
+            font->glyphs[i].t1 = (float)(y + h) / (float)ph;
             continue;
         }
         
@@ -234,13 +246,13 @@ draw_font *draw_font_create(const char *ttf_path, int *glyphs, int glyph_count, 
     };
     kore_gpu_device_create_texture(g_device, &tex_params, &font->texture);
     
-    // 转换为 RGBA: glyph 在 R 通道, 其他为 0
+    // 转换为 RGBA
     uint8_t *rgba_pixels = (uint8_t *)malloc(pw * ph * 4);
     for (int i = 0; i < pw * ph; i++) {
-        rgba_pixels[i * 4 + 0] = font->atlas_pixels[i];  // R = glyph alpha
-        rgba_pixels[i * 4 + 1] = 0;  // G = 0
-        rgba_pixels[i * 4 + 2] = 0;  // B = 0
-        rgba_pixels[i * 4 + 3] = 255; // A = 255 (不透明，alpha 由 R 通道控制)
+        rgba_pixels[i * 4 + 0] = font->atlas_pixels[i];
+        rgba_pixels[i * 4 + 1] = font->atlas_pixels[i];
+        rgba_pixels[i * 4 + 2] = font->atlas_pixels[i];
+        rgba_pixels[i * 4 + 3] = font->atlas_pixels[i];
     }
     kore_gpu_texture_upload(g_device, &font->texture, rgba_pixels, pw, ph);
     free(rgba_pixels);
@@ -268,7 +280,7 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
         p += len;
         
         glyph_info *gi = find_glyph(font, codepoint);
-        if (gi && gi->width > 0) {
+        if (gi) {
             char_count++;
         }
     }
@@ -321,7 +333,13 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
         p += len;
         
         glyph_info *gi = find_glyph(font, codepoint);
-        if (!gi || gi->width == 0) continue;
+        if (!gi) {
+            continue;
+        }
+        xpos += gi->xadvance;
+        if (gi->width == 0) {
+            continue;
+        }
         
         float w = (float)gi->width;
         float h = (float)gi->height;
@@ -372,10 +390,12 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
         }
     }
     
-    everything_set_update updates[1];
+    everything_set_update updates[2];
     updates[0].kind = EVERYTHING_SET_UPDATE_CONSTANTS;
     updates[0].constants = &g_uniform_buffer;
-    kong_update_everything_set(&font->set, updates, 1);
+    updates[1].kind = EVERYTHING_SET_UPDATE_TEX;
+    updates[1].tex = font->texture_view;
+    kong_update_everything_set(&font->set, updates, 2);
     
     kore_log(KORE_LOG_LEVEL_INFO, "draw_string: calling draw, indices=%d", total_indices);
     
