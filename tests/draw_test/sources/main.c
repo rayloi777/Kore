@@ -106,6 +106,8 @@ int kickstart(int argc, char **argv) {
     
     font = draw_font_create("NotoSansTC-Regular.ttf", basic_glyphs, sizeof(basic_glyphs) / sizeof(basic_glyphs[0]), 64.0f);
     
+    fprintf(stderr, "Font create returned: %p\n", (void*)font);
+    
     if (font) {
         kore_log(KORE_LOG_LEVEL_INFO, "Font loaded successfully");
     } else {

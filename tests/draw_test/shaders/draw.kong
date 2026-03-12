@@ -11,6 +11,7 @@ struct vertex_out {
 #[set(everything)]
 const constants: {
     mvp: float4x4;
+    color: float4;
 };
 
 #[set(everything)]
@@ -35,7 +36,8 @@ fun pos_shader(input: vertex_in): vertex_out {
 
 #[fragment]
 fun pix(input: vertex_out): float4 {
-    return float4(1.0, 1.0, 0.0, 1.0);
+    // 测试：纯蓝色，不使用纹理
+    return float4(0.0, 0.0, 1.0, 1.0);
 }
 
 #[pipe]
@@ -44,12 +46,12 @@ struct text_pipeline {
     fragment = pix;
     format = framebuffer_format();
     depth_format = TEXTURE_FORMAT_DEPTH32_FLOAT;
-    depth_write = true;
-    depth_compare = COMPARE_LESS;
-    blend_source = BLEND_FACTOR_SRC_ALPHA;
+    depth_write = false;
+    depth_compare = COMPARE_ALWAYS;
+    blend_source = BLEND_FACTOR_ONE;
     blend_destination = BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     blend_operation = BLEND_OPERATION_ADD;
-    alpha_blend_source = BLEND_FACTOR_SRC_ALPHA;
+    alpha_blend_source = BLEND_FACTOR_ONE;
     alpha_blend_destination = BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     alpha_blend_operation = BLEND_OPERATION_ADD;
 }

@@ -229,11 +229,21 @@ draw_font *draw_font_create(const char *ttf_path, int *glyphs, int glyph_count, 
         .mip_level_count = 1,
         .sample_count = 1,
         .dimension = KORE_GPU_TEXTURE_DIMENSION_2D,
-        .format = KORE_GPU_TEXTURE_FORMAT_R8_UNORM,
+        .format = KORE_GPU_TEXTURE_FORMAT_RGBA8_UNORM,
         .usage = KORE_GPU_TEXTURE_USAGE_SAMPLED | KORE_GPU_TEXTURE_USAGE_COPY_DST,
     };
     kore_gpu_device_create_texture(g_device, &tex_params, &font->texture);
-    kore_gpu_texture_upload(g_device, &font->texture, font->atlas_pixels, pw, ph);
+    
+    // 转换为 RGBA: glyph 在 R 通道, 其他为 0
+    uint8_t *rgba_pixels = (uint8_t *)malloc(pw * ph * 4);
+    for (int i = 0; i < pw * ph; i++) {
+        rgba_pixels[i * 4 + 0] = font->atlas_pixels[i];  // R = glyph alpha
+        rgba_pixels[i * 4 + 1] = 0;  // G = 0
+        rgba_pixels[i * 4 + 2] = 0;  // B = 0
+        rgba_pixels[i * 4 + 3] = 255; // A = 255 (不透明，alpha 由 R 通道控制)
+    }
+    kore_gpu_texture_upload(g_device, &font->texture, rgba_pixels, pw, ph);
+    free(rgba_pixels);
     
     kore_gpu_texture_view_create(g_device, &font->texture, &font->texture_view);
     
@@ -248,11 +258,6 @@ draw_font *draw_font_create(const char *ttf_path, int *glyphs, int glyph_count, 
 }
 
 void draw_string(draw_font *font, const char *utf8_text, float x, float y, float r, float g, float b, float a) {
-    (void)r;
-    (void)g;
-    (void)b;
-    (void)a;
-    
     if (!font || !utf8_text || !g_list || !g_initialized) return;
     
     int char_count = 0;
@@ -269,8 +274,6 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
     }
     
     if (char_count == 0) return;
-    
-    kore_log(KORE_LOG_LEVEL_INFO, "draw_string: %d chars at (%.0f, %.0f)", char_count, x, y);
     
     int total_vertices = char_count * 4;
     int total_indices = char_count * 6;
@@ -324,9 +327,9 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
         float h = (float)gi->height;
         
         float x0 = (xpos + gi->xoffset) / screen_w * 2.0f - 1.0f;
-        float y0 = -((ypos + gi->yoffset) / screen_h * 2.0f - 1.0f);
+        float y0 = (ypos + gi->yoffset) / screen_h * 2.0f - 1.0f;
         float x1 = x0 + w / screen_w * 2.0f;
-        float y1 = y0 - h / screen_h * 2.0f;
+        float y1 = y0 + h / screen_h * 2.0f;
         
         uint16_t base = (uint16_t)(char_idx * 4);
         
@@ -337,13 +340,13 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
         all_indices[iidx++] = base + 2;
         all_indices[iidx++] = base + 3;
         
-        all_verts[vidx + 0].pos = (kore_float3){x0, y0, 0.0f};
+        all_verts[vidx + 0].pos = (kore_float3){x0, y0, 0.5f};
         all_verts[vidx + 0].uv = (kore_float2){gi->s0, gi->t1};
-        all_verts[vidx + 1].pos = (kore_float3){x1, y0, 0.0f};
+        all_verts[vidx + 1].pos = (kore_float3){x1, y0, 0.5f};
         all_verts[vidx + 1].uv = (kore_float2){gi->s1, gi->t1};
-        all_verts[vidx + 2].pos = (kore_float3){x1, y1, 0.0f};
+        all_verts[vidx + 2].pos = (kore_float3){x1, y1, 0.5f};
         all_verts[vidx + 2].uv = (kore_float2){gi->s1, gi->t0};
-        all_verts[vidx + 3].pos = (kore_float3){x0, y1, 0.0f};
+        all_verts[vidx + 3].pos = (kore_float3){x0, y1, 0.5f};
         all_verts[vidx + 3].uv = (kore_float2){gi->s0, gi->t0};
         
         vidx += 4;
@@ -364,6 +367,7 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
         constants_type *ptr = constants_type_buffer_lock(&g_uniform_buffer, 0, 1);
         if (ptr) {
             ptr->mvp = mvp;
+            ptr->color = (kore_float4){r, g, b, a};
             constants_type_buffer_unlock(&g_uniform_buffer);
         }
     }

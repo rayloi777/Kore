@@ -76,7 +76,7 @@ int kickstart(int argc, char **argv) {
 
     kore_gpu_device_create_command_list(&device, KORE_GPU_COMMAND_LIST_TYPE_GRAPHICS, &list);
     
-    draw_init(&device);
+    draw_init(&device, &list);
     
     font = draw_font_create("deployment/NotoSansTC-Regular.ttf", basic_glyphs, sizeof(basic_glyphs) / sizeof(basic_glyphs[0]), 24.0f);
     
