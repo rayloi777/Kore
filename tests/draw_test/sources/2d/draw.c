@@ -58,6 +58,9 @@ static bool g_initialized = false;
 static int g_max_vertices = 0;
 static int g_max_indices = 0;
 
+static int g_vertex_offset = 0;
+static int g_index_offset = 0;
+
 static uint32_t utf8_decode(const char *s, int *len) {
     uint32_t c = (unsigned char)s[0];
     if (c < 0x80) {
@@ -122,6 +125,11 @@ void draw_init(void *device, void *command_list) {
 void draw_set_viewport(int width, int height) {
     g_screen_width = width;
     g_screen_height = height;
+}
+
+void draw_begin(void) {
+    g_vertex_offset = 0;
+    g_index_offset = 0;
 }
 
 draw_font *draw_font_create(const char *ttf_path, int *glyphs, int glyph_count, float size) {
@@ -290,28 +298,30 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
     int total_vertices = char_count * 4;
     int total_indices = char_count * 6;
     
-    if (total_vertices > g_max_vertices) {
+    int needed_vertices = g_vertex_offset + total_vertices;
+    if (needed_vertices > g_max_vertices) {
         if (g_vertex_buffer.metal.buffer) {
             kore_gpu_buffer_destroy(&g_vertex_buffer);
         }
         kore_gpu_buffer_parameters vb_params = {
-            .size = sizeof(vertex_in) * total_vertices,
+            .size = sizeof(vertex_in) * needed_vertices,
             .usage_flags = KORE_GPU_BUFFER_USAGE_VERTEX | KORE_GPU_BUFFER_USAGE_CPU_WRITE,
         };
         kore_gpu_device_create_buffer(g_device, &vb_params, &g_vertex_buffer);
-        g_max_vertices = total_vertices;
+        g_max_vertices = needed_vertices;
     }
     
-    if (total_indices > g_max_indices) {
+    int needed_indices = g_index_offset + total_indices;
+    if (needed_indices > g_max_indices) {
         if (g_index_buffer.metal.buffer) {
             kore_gpu_buffer_destroy(&g_index_buffer);
         }
         kore_gpu_buffer_parameters ib_params = {
-            .size = sizeof(uint16_t) * total_indices,
+            .size = sizeof(uint16_t) * needed_indices,
             .usage_flags = KORE_GPU_BUFFER_USAGE_INDEX | KORE_GPU_BUFFER_USAGE_CPU_WRITE,
         };
         kore_gpu_device_create_buffer(g_device, &ib_params, &g_index_buffer);
-        g_max_indices = total_indices;
+        g_max_indices = needed_indices;
     }
     
     vertex_in *all_verts = (vertex_in *)malloc(sizeof(vertex_in) * total_vertices);
@@ -349,7 +359,7 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
         float x1 = x0 + w / screen_w * 2.0f;
         float y1 = y0 + h / screen_h * 2.0f;
         
-        uint16_t base = (uint16_t)(char_idx * 4);
+        uint16_t base = (uint16_t)(g_vertex_offset + char_idx * 4);
         
         all_indices[iidx++] = base + 0;
         all_indices[iidx++] = base + 1;
@@ -360,12 +370,16 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
         
         all_verts[vidx + 0].pos = (kore_float3){x0, y0, 0.5f};
         all_verts[vidx + 0].uv = (kore_float2){gi->s0, gi->t1};
+        all_verts[vidx + 0].color = (kore_float4){r, g, b, a};
         all_verts[vidx + 1].pos = (kore_float3){x1, y0, 0.5f};
         all_verts[vidx + 1].uv = (kore_float2){gi->s1, gi->t1};
+        all_verts[vidx + 1].color = (kore_float4){r, g, b, a};
         all_verts[vidx + 2].pos = (kore_float3){x1, y1, 0.5f};
         all_verts[vidx + 2].uv = (kore_float2){gi->s1, gi->t0};
+        all_verts[vidx + 2].color = (kore_float4){r, g, b, a};
         all_verts[vidx + 3].pos = (kore_float3){x0, y1, 0.5f};
         all_verts[vidx + 3].uv = (kore_float2){gi->s0, gi->t0};
+        all_verts[vidx + 3].color = (kore_float4){r, g, b, a};
         
         vidx += 4;
         char_idx++;
@@ -373,11 +387,11 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
     }
     
     void *vb_ptr = kore_gpu_buffer_lock_all(&g_vertex_buffer);
-    memcpy(vb_ptr, all_verts, sizeof(vertex_in) * total_vertices);
+    memcpy((uint8_t *)vb_ptr + g_vertex_offset * sizeof(vertex_in), all_verts, sizeof(vertex_in) * total_vertices);
     kore_gpu_buffer_unlock_all(&g_vertex_buffer);
     
     void *ib_ptr = kore_gpu_buffer_lock_all(&g_index_buffer);
-    memcpy(ib_ptr, all_indices, sizeof(uint16_t) * total_indices);
+    memcpy((uint8_t *)ib_ptr + g_index_offset * sizeof(uint16_t), all_indices, sizeof(uint16_t) * total_indices);
     kore_gpu_buffer_unlock_all(&g_index_buffer);
     
     kore_matrix4x4 mvp = kore_matrix4x4_identity();
@@ -385,7 +399,6 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
         constants_type *ptr = constants_type_buffer_lock(&g_uniform_buffer, 0, 1);
         if (ptr) {
             ptr->mvp = mvp;
-            ptr->color = (kore_float4){r, g, b, a};
             constants_type_buffer_unlock(&g_uniform_buffer);
         }
     }
@@ -397,14 +410,15 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
     updates[1].tex = font->texture_view;
     kong_update_everything_set(&font->set, updates, 2);
     
-    kore_log(KORE_LOG_LEVEL_INFO, "draw_string: calling draw, indices=%d", total_indices);
-    
     kong_set_render_pipeline_text_pipeline(g_list);
-    kore_metal_command_list_set_vertex_buffer(g_list, 0, &g_vertex_buffer.metal, 0, sizeof(vertex_in) * total_vertices, sizeof(vertex_in));
-    kore_gpu_command_list_set_index_buffer(g_list, &g_index_buffer, KORE_GPU_INDEX_FORMAT_UINT16, 0);
     kong_set_descriptor_set_everything(g_list, &font->set);
+    kore_metal_command_list_set_vertex_buffer(g_list, 0, &g_vertex_buffer.metal, 0, 0, sizeof(vertex_in));
+    kore_gpu_command_list_set_index_buffer(g_list, &g_index_buffer, KORE_GPU_INDEX_FORMAT_UINT16, 0);
     
-    kore_gpu_command_list_draw_indexed(g_list, total_indices, 1, 0, 0, 0);
+    kore_gpu_command_list_draw_indexed(g_list, total_indices, 1, g_index_offset, 0, 0);
+    
+    g_vertex_offset += total_vertices;
+    g_index_offset += total_indices;
     
     free(all_verts);
     free(all_indices);

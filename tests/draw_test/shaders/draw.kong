@@ -1,11 +1,13 @@
 struct vertex_in {
     pos: float3;
     uv: float2;
+    color: float4;
 }
 
 struct vertex_out {
     pos: float4;
     uv: float2;
+    color: float4;
 }
 
 #[set(everything)]
@@ -30,6 +32,7 @@ fun pos_shader(input: vertex_in): vertex_out {
     
     out.pos = constants.mvp * position;
     out.uv = input.uv;
+    out.color = input.color;
     
     return out;
 }
@@ -37,7 +40,7 @@ fun pos_shader(input: vertex_in): vertex_out {
 #[fragment]
 fun pix(input: vertex_out): float4 {
     var tex_color: float4 = sample(tex, sam, input.uv);
-    return float4(constants.color.rgb * tex_color.r, tex_color.r);
+    return float4(input.color.rgb * tex_color.r, tex_color.r);
 }
 
 #[pipe]

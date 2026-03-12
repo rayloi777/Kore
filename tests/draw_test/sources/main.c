@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+void draw_begin(void);
+
 static const int width = 800;
 static const int height = 600;
 
@@ -16,16 +18,6 @@ static kore_gpu_device device;
 static kore_gpu_command_list list;
 static draw_font *font;
 static kore_gpu_texture depth_texture;
-
-static int basic_glyphs[] = {
-    32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
-    48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
-    64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79,
-    80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95,
-    96, 97, 98, 99,
-    100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115,
-    116, 117, 118, 119, 120, 121, 122,
-};
 
 static void update(void *data) {
     (void)data;
@@ -47,19 +39,12 @@ static void update(void *data) {
                 },
             },
         },
-        .depth_stencil_attachment = {
-            .texture = &depth_texture,
-            .depth_load_op = KORE_GPU_LOAD_OP_CLEAR,
-            .depth_store_op = KORE_GPU_STORE_OP_STORE,
-            .depth_clear_value = 1.0f,
-            .stencil_load_op = KORE_GPU_LOAD_OP_LOAD,
-            .stencil_store_op = KORE_GPU_STORE_OP_DISCARD,
-            .stencil_clear_value = 0,
-        },
     };
     kore_gpu_command_list_begin_render_pass(&list, &parameters);
     
     kore_gpu_command_list_set_viewport(&list, 0, 0, (float)framebuffer->width, (float)framebuffer->height, 0.0f, 1.0f);
+    
+    draw_begin();
     
     if (font) {
         draw_string(font, "Hello World!", 50.0f, 100.0f, 1.0f, 1.0f, 1.0f, 1.0f);
@@ -106,7 +91,7 @@ int kickstart(int argc, char **argv) {
     };
     kore_gpu_device_create_texture(&device, &depth_params, &depth_texture);
     
-    font = draw_font_create("NotoSansTC-Regular.ttf", basic_glyphs, sizeof(basic_glyphs) / sizeof(basic_glyphs[0]), 64.0f);
+    font = draw_font_create("NotoSansTC-Regular.ttf", (int *)kore_basic_glyphs, KORE_BASIC_GLYPHS_COUNT, 64.0f);
     
     fprintf(stderr, "Font create returned: %p\n", (void*)font);
     
