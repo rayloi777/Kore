@@ -342,12 +342,16 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
         
         all_verts[vidx + 0].pos = (kore_float3){x0, y0, 0.5f};
         all_verts[vidx + 0].uv = (kore_float2){gi->s0, gi->t1};
+        all_verts[vidx + 0].color = (kore_float4){r, g, b, a};
         all_verts[vidx + 1].pos = (kore_float3){x1, y0, 0.5f};
         all_verts[vidx + 1].uv = (kore_float2){gi->s1, gi->t1};
+        all_verts[vidx + 1].color = (kore_float4){r, g, b, a};
         all_verts[vidx + 2].pos = (kore_float3){x1, y1, 0.5f};
         all_verts[vidx + 2].uv = (kore_float2){gi->s1, gi->t0};
+        all_verts[vidx + 2].color = (kore_float4){r, g, b, a};
         all_verts[vidx + 3].pos = (kore_float3){x0, y1, 0.5f};
         all_verts[vidx + 3].uv = (kore_float2){gi->s0, gi->t0};
+        all_verts[vidx + 3].color = (kore_float4){r, g, b, a};
         
         vidx += 4;
         char_idx++;

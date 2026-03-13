@@ -1,57 +1,60 @@
-#[set(everything)]
-const mvp: float3x3;
-
-#[set(everything)]
-const pos: float4;
-
-#[set(everything)]
-const uv: float4;
-
-#[set(everything)]
-const col: float4;
-
 struct vertex_in {
-	pos: float2;
+    pos: float3;
+    uv: float2;
+    color: float4;
 }
 
 struct vertex_out {
-	pos: float4;
-	uv: float2;
-	col: float4;
+    pos: float4;
+    uv: float2;
+    color: float4;
 }
 
-fun pos_shader(input: vertex_in): vertex_out {
-	var output: vertex_out;
-	var p: float4 = pos;
-	var t: float4 = uv;
-	var c: float4 = col;
-	
-	output.pos = float4(input.pos.x, input.pos.y, 0.0, 1.0);
-	output.pos.xy = output.pos.xy * p.zw + p.xy;
-	output.pos.xy = output.pos.xy * 2.0 - 1.0;
-	output.pos.y = -output.pos.y;
-	
-	output.uv = input.pos * t.zw + t.xy;
-	output.col = c;
-	
-	return output;
-}
+#[set(everything)]
+const constants: {
+    mvp: float4x4;
+    color: float4;
+};
 
-#[set(tex)]
+#[set(everything)]
 const tex: tex2d;
 
-#[set(tex)]
+#[set(everything)]
 const sam: sampler;
 
+#[vertex]
+fun pos_shader(input: vertex_in): vertex_out {
+    var out: vertex_out;
+    
+    var position: float4;
+    position.xyz = input.pos;
+    position.w = 1.0;
+    
+    out.pos = constants.mvp * position;
+    out.uv = input.uv;
+    out.color = input.color;
+    
+    return out;
+}
+
+#[fragment]
 fun pix(input: vertex_out): float4 {
-	var tc = sample(tex, sam, input.uv);
-	var alpha = tc.r * input.col.a;
-	return float4(input.col.rgb * alpha, alpha);
+    var tex_color: float4 = sample(tex, sam, input.uv);
+    var alpha: float;
+    if (tex_color.r > 0.0) {
+        alpha = 1.0;
+    } else {
+        alpha = 0.0;
+    }
+    return float4(input.color.rgb * tex_color.r, alpha);
 }
 
 #[pipe]
 struct text_pipeline {
-	vertex = pos_shader;
-	fragment = pix;
-	format = framebuffer_format();
+    vertex = pos_shader;
+    fragment = pix;
+    format = framebuffer_format();
+    depth_format = TEXTURE_FORMAT_DEPTH32_FLOAT;
+    depth_write = false;
+    depth_compare = COMPARE_ALWAYS;
 }

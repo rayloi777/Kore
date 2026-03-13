@@ -40,7 +40,8 @@ fun pos_shader(input: vertex_in): vertex_out {
 #[fragment]
 fun pix(input: vertex_out): float4 {
     var tex_color: float4 = sample(tex, sam, input.uv);
-    return float4(input.color.rgb * tex_color.r, tex_color.r);
+    var alpha: float = tex_color.r > 0.0 ? 1.0 : 0.0;
+    return float4(input.color.rgb * tex_color.r, alpha);
 }
 
 #[pipe]
@@ -51,10 +52,4 @@ struct text_pipeline {
     depth_format = TEXTURE_FORMAT_DEPTH32_FLOAT;
     depth_write = false;
     depth_compare = COMPARE_ALWAYS;
-    blend_source = BLEND_FACTOR_ONE;
-    blend_destination = BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-    blend_operation = BLEND_OPERATION_ADD;
-    alpha_blend_source = BLEND_FACTOR_ONE;
-    alpha_blend_destination = BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-    alpha_blend_operation = BLEND_OPERATION_ADD;
 }
