@@ -346,8 +346,8 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
         if (!gi) {
             continue;
         }
-        xpos += gi->xadvance;
         if (gi->width == 0) {
+            xpos += gi->xadvance;
             continue;
         }
         
@@ -355,7 +355,7 @@ void draw_string(draw_font *font, const char *utf8_text, float x, float y, float
         float h = (float)gi->height;
         
         float x0 = (xpos + gi->xoffset) / screen_w * 2.0f - 1.0f;
-        float y0 = (ypos + gi->yoffset) / screen_h * 2.0f - 1.0f;
+        float y0 = ypos / screen_h * 2.0f - 1.0f;
         float x1 = x0 + w / screen_w * 2.0f;
         float y1 = y0 + h / screen_h * 2.0f;
         
