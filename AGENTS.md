@@ -24,7 +24,7 @@ Cross-platform C game engine with multi-GPU support (Metal, Vulkan, OpenGL, Dire
 | Math | `includes/kore3/math/` (SIMD in `sources/math/`) |
 | Audio | `includes/kore3/mixer/` or `audio/` |
 | Backend impl | `backends/gpu/metal/`, `backends/system/macos/` |
-| Tests | `tests/cube_test/`, `tests/texture_test/`, `tests/audio_test/`, `tests/mipmap_test/`, `tests/computeshader_test/`, `tests/g2_test/`, `tests/raytracing_cornellbox/` |
+| Tests | `tests/cube_test/`, `tests/texture_test/`, `tests/audio_test/`, `tests/mipmap_test/`, `tests/computeshader_test/`, `tests/g2_test/`, `tests/raytracing_cornellbox/`, `tests/draw_test/` |
 
 ## BUILD
 ```bash
@@ -61,6 +61,59 @@ open build/build/Release/computeshader_test.app
 - g2 2D rendering: orthographic projection matrix for screen coords → NDC
   - kore_matrix3x3 is column-major: m[x*3+y] = column x, row y
   - 2D ortho matrix (screen 0,width × 0,height → NDC -1,1): m[0]=2/width, m[4]=2/height, m[2]=-1, m[5]=-1
+
+## TEXT RENDERING
+- **Test:** `tests/draw_test/` - Font rendering with stb_truetype
+- **Build:** `./make -g metal --kore . --from tests/draw_test --compile`
+
+### API
+```c
+#include <kore3/text.h>
+
+// Initialize drawing system
+void draw_init(void *device, void *command_list);
+void draw_set_viewport(int width, int height);
+
+// Create/destroy fonts
+draw_font *draw_font_create(const char *ttf_path, int *glyphs, int glyph_count, float size);
+void draw_font_destroy(draw_font *font);
+
+// Draw text (called within a render pass)
+void draw_begin(void);
+void draw_string(draw_font *font, const char *utf8_text, float x, float y, float r, float g, float b, float a);
+
+// Get text width in pixels
+float draw_string_width(draw_font *font, const char *utf8_text);
+```
+
+### Usage
+```c
+// Create multiple fonts with different sizes
+draw_font *font_small = draw_font_create("NotoSansTC-Regular.ttf", kore_basic_glyphs, KORE_BASIC_GLYPHS_COUNT, 24.0f);
+draw_font *font_medium = draw_font_create("NotoSansTC-Regular.ttf", kore_basic_glyphs, KORE_BASIC_GLYPHS_COUNT, 48.0f);
+draw_font *font_large = draw_font_create("NotoSansTC-Regular.ttf", kore_basic_glyphs, KORE_BASIC_GLYPHS_COUNT, 72.0f);
+
+// In render loop:
+draw_begin();
+if (font_small) draw_string(font_small, "Small text", 50.0f, 100.0f, 1.0f, 0.0f, 0.0f, 1.0f);  // red
+if (font_medium) draw_string(font_medium, "Medium text", 50.0f, 200.0f, 0.0f, 1.0f, 0.0f, 1.0f);  // green
+if (font_large) draw_string(font_large, "Large text", 50.0f, 350.0f, 0.0f, 0.0f, 1.0f, 1.0f);  // blue
+```
+
+### Implementation Details
+- Each font creates its own texture atlas (512x512 RGBA8)
+- Each font has its own descriptor set with texture bound at creation
+- Uses stb_truetype for font rasterization
+- Text rendered using immediate draw (each draw_string draws immediately)
+- Per-vertex color support for different colored text
+- Screen coordinates (0,0 = top-left) converted to NDC (-1 to 1)
+- Y position includes font baseline adjustment
+
+### Notes
+- stb_truetype generates glyph bitmaps with proper vertical positioning in the bitmap
+- The `yoffset` from stb_truetype is baked into the glyph bitmap position
+- Baseline calculation: `(float)ascent * scale` - top of lowercase 'x' aligns here
+- Descender characters (g, y, p, q, j) are positioned correctly in the atlas
 
 ## UI DIALOGS
 - **Header:** `includes/kore3/ui.h`

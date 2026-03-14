@@ -1,6 +1,6 @@
 # tests - Test Applications
 
-**Parent:** `./AGENTS.md` | **18 tests, 15 subdirectories**
+**Parent:** `./AGENTS.md` | **19 tests, 16 subdirectories**
 
 ## OVERVIEW
 Self-contained test/demo applications. Each test is a mini-app demonstrating specific features.
@@ -25,6 +25,7 @@ tests/
 ├── display/             # Display enumeration
 ├── multiwindow/         # Multiple windows
 ├── text_test/           # Text rendering
+├── draw_test/           # Font rendering with stb_truetype ✅
 └── image_compress/      # Image compression
 ```
 
@@ -37,6 +38,7 @@ tests/
 | texture_test | `./make -g metal ... --from tests/texture_test` | Texture upload, RGBA8, Kongruent shader |
 | mipmap_test | `./make -g metal ... --from tests/mipmap_test` | Mipmap levels, sample_lod |
 | computeshader_test | `./make -g metal ... --from tests/computeshader_test` | Compute shader, texture output ✅ iOS works |
+| draw_test | `./make -g metal ... --from tests/draw_test` | Font rendering, multiple font sizes |
 | audio_test | `./make -g metal ... --from tests/audio_test` | OGG + sine wave |
 | matrix_test | `./make -g metal ... --from tests/matrix_test` | SIMD benchmarks |
 
