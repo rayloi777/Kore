@@ -16,7 +16,9 @@ static const int height = 600;
 
 static kore_gpu_device device;
 static kore_gpu_command_list list;
-static draw_font *font;
+static draw_font *font_small;
+static draw_font *font_medium;
+static draw_font *font_large;
 static kore_gpu_texture depth_texture;
 
 static void update(void *data) {
@@ -46,16 +48,14 @@ static void update(void *data) {
     
     draw_begin();
     
-    if (font) {
-        draw_string(font, "Hello World!", 50.0f, 100.0f, 1.0f, 1.0f, 1.0f, 1.0f);
-        draw_string(font, "ABC", 50.0f, 150.0f, 1.0f, 0.0f, 0.0f, 1.0f);
-        draw_string(font, "abc", 50.0f, 200.0f, 0.0f, 1.0f, 0.0f, 1.0f);
-        draw_string(font, "0123", 50.0f, 250.0f, 1.0f, 1.0f, 0.0f, 1.0f);
-        
-        float w = draw_string_width(font, "Hello World!");
-        char buf[64];
-        snprintf(buf, sizeof(buf), "Width: %.1f", w);
-        draw_string(font, buf, 50.0f, 300.0f, 1.0f, 0.5f, 0.0f, 1.0f);
+    if (font_small) {
+        draw_string(font_small, "Small 24px", 50.0f, 100.0f, 1.0f, 0.0f, 0.0f, 1.0f);
+    }
+    if (font_medium) {
+        draw_string(font_medium, "Medium 48px", 50.0f, 200.0f, 0.0f, 1.0f, 0.0f, 1.0f);
+    }
+    if (font_large) {
+        draw_string(font_large, "Large 72px", 50.0f, 350.0f, 0.0f, 0.0f, 1.0f, 1.0f);
     }
     
     kore_gpu_command_list_end_render_pass(&list);
@@ -91,21 +91,22 @@ int kickstart(int argc, char **argv) {
     };
     kore_gpu_device_create_texture(&device, &depth_params, &depth_texture);
     
-    font = draw_font_create("NotoSansTC-Regular.ttf", (int *)kore_basic_glyphs, KORE_BASIC_GLYPHS_COUNT, 64.0f);
+    font_small = draw_font_create("NotoSansTC-Regular.ttf", (int *)kore_basic_glyphs, KORE_BASIC_GLYPHS_COUNT, 24.0f);
+    font_medium = draw_font_create("NotoSansTC-Regular.ttf", (int *)kore_basic_glyphs, KORE_BASIC_GLYPHS_COUNT, 48.0f);
+    font_large = draw_font_create("NotoSansTC-Regular.ttf", (int *)kore_basic_glyphs, KORE_BASIC_GLYPHS_COUNT, 72.0f);
     
-    fprintf(stderr, "Font create returned: %p\n", (void*)font);
+    fprintf(stderr, "Fonts: small=%p medium=%p large=%p\n", 
+            (void*)font_small, (void*)font_medium, (void*)font_large);
     
-    if (font) {
-        kore_log(KORE_LOG_LEVEL_INFO, "Font loaded successfully");
-    } else {
-        kore_log(KORE_LOG_LEVEL_ERROR, "Font failed to load");
-    }
+    if (font_small) kore_log(KORE_LOG_LEVEL_INFO, "Font small loaded");
+    if (font_medium) kore_log(KORE_LOG_LEVEL_INFO, "Font medium loaded");
+    if (font_large) kore_log(KORE_LOG_LEVEL_INFO, "Font large loaded");
 
     kore_start();
 
-    if (font) {
-        draw_font_destroy(font);
-    }
+    if (font_small) draw_font_destroy(font_small);
+    if (font_medium) draw_font_destroy(font_medium);
+    if (font_large) draw_font_destroy(font_large);
     kore_gpu_command_list_destroy(&list);
     kore_gpu_device_destroy(&device);
 
